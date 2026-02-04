@@ -1,4 +1,4 @@
-const CACHE_NAME = "pocket-reader-v7";
+const CACHE_NAME = "pocket-reader-v8";
 const ASSETS = ["./","./index.html","./manifest.webmanifest","./icon.svg"];
 
 self.addEventListener("install", (event) => {
