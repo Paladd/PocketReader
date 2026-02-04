@@ -174,7 +174,13 @@
   <!-- DOCX -->
   <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
   <!-- PDF.js -->
+  if (window.pdfjsLib) {
+  pdfjsLib.GlobalWorkerOptions.workerSrc =
+    "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
+}
+
   <script src="https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
+  
   <!-- OCR -->
   <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 </head>
@@ -575,22 +581,35 @@
   stopBtn.addEventListener("click", stopSpeaking);
 
   // --------- DOCX + PDF (Load tab) ----------
-  async function docxToText(arrayBuffer){
-    const result = await mammoth.extractRawText({ arrayBuffer });
-    return (result && result.value ? result.value : "").replace(/\n{3,}/g, "\n\n").trim();
-  }
+ async function pdfToText(arrayBuffer){
+  const bytes = new Uint8Array(arrayBuffer);
 
-  async function pdfToText(arrayBuffer){
-    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
-    let out = [];
-    for (let p = 1; p <= pdf.numPages; p++){
-      const page = await pdf.getPage(p);
-      const tc = await page.getTextContent();
-      const pageText = tc.items.map(it => it.str).join(" ");
-      out.push(pageText);
-    }
-    return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
+  const loadingTask = pdfjsLib.getDocument({
+    data: bytes,
+    disableAutoFetch: true,
+    disableStream: true,
+    disableRange: true,
+    stopAtErrors: false,
+    verbosity: 0
+  });
+
+  loadingTask.onPassword = (updatePassword) => {
+    const pw = prompt("This PDF is password-protected. Enter password:");
+    if (pw) updatePassword(pw);
+  };
+
+  const pdf = await loadingTask.promise;
+
+  let out = [];
+  for (let p = 1; p <= pdf.numPages; p++){
+    const page = await pdf.getPage(p);
+    const tc = await page.getTextContent();
+    const pageText = tc.items.map(it => it.str).join(" ");
+    out.push(pageText);
   }
+  return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
+}
+
 
   fileInput.addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
@@ -622,10 +641,11 @@
       const raw = await f.text();
       loadText(raw, `File: ${f.name}`, "text");
       setStatus(fileStatus, `Loaded file: ${f.name}`, "ok");
-    } catch(err){
-      console.error(err);
-      setStatus(fileStatus, "Could not open that file. If it’s a scanned PDF, use OCR tab.", "warn");
-    } finally {
+    } catch (err) {
+  console.error(err);
+  setStatus(fileStatus, `PDF failed:\n${err?.message || String(err)}`, "danger");
+}
+ finally {
       fileInput.value = "";
     }
   });
