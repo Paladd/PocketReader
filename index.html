@@ -22,15 +22,14 @@
       position:sticky; top:0; z-index:50;
       background:rgba(18,20,27,.9); backdrop-filter: blur(10px);
       border-bottom:1px solid var(--stroke);
-      padding:12px 14px; display:flex; align-items:center; justify-content:space-between; gap:10px;
+      padding:12px 14px; display:flex; align-items:center; gap:10px;
     }
-    .brand{ display:flex; align-items:center; gap:10px; }
     .logo{ width:34px; height:34px; border-radius:10px;
       background:linear-gradient(135deg, var(--brand), #8ab4ff);
       box-shadow: 0 10px 30px rgba(42,91,215,.25);
     }
-    .brand h1{ margin:0; font-size:16px; }
-    .brand .sub{ margin:2px 0 0 0; font-size:12px; color:var(--muted); }
+    h1{ margin:0; font-size:16px; }
+    .sub{ margin:2px 0 0 0; font-size:12px; color:var(--muted); }
 
     .chipbar{
       padding:10px 12px; display:flex; gap:8px; flex-wrap:wrap;
@@ -65,13 +64,13 @@
       overflow:hidden;
       box-shadow: 0 10px 30px rgba(0,0,0,.25);
     }
-    .card .hd{
+    .hd{
       padding:12px;
-      display:flex; align-items:center; justify-content:space-between; gap:10px;
+      display:flex; align-items:center; justify-content:space-between;
       border-bottom:1px solid var(--stroke);
       font-weight:900;
     }
-    .card .bd{ padding:12px; }
+    .bd{ padding:12px; }
 
     input, select, button, textarea{
       width:100%;
@@ -88,15 +87,13 @@
     button{ cursor:pointer; font-weight:900; }
     .primary{ background:var(--brand); border-color:var(--brand); }
     .ghost{ background:transparent; }
-    .danger{ background:var(--danger); border-color:var(--danger); }
-
     .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .row > *{ flex:1; }
+
     .muted{ color:var(--muted); font-size:12px; }
     .status{ margin-top:8px; font-size:12px; color:#9fe6b8; white-space:pre-wrap; }
     .warn{ color:#ffd27d; }
     .dangerText{ color:#ff9f9f; }
-    .tiny{ font-size:11px; color:var(--muted); line-height:1.4; }
 
     #reader{
       white-space:pre-wrap;
@@ -110,53 +107,23 @@
       overflow:auto;
       border:1px solid var(--stroke);
     }
-    @media (max-width:980px){ #reader{ max-height:52vh; } }
     .sent{ padding:.12em 0; border-radius:8px; cursor:pointer; }
-    .sent:hover{ outline:1px solid rgba(174,179,199,.25); }
     .sent.active{ background: rgba(42,91,215,.22); outline:1px solid rgba(42,91,215,.45); }
 
-    .progressWrap{ margin-top:10px; }
-    .progressBar{
-      width:100%; height:10px; border-radius:999px;
-      background:var(--panel);
-      border:1px solid var(--stroke2);
-      overflow:hidden;
-    }
-    .progressFill{ height:100%; width:0%; background:var(--brand); }
-
-    .previewImg{
-      width:100%;
-      border-radius:16px;
-      border:1px solid var(--stroke);
-      background:var(--panel);
-      max-height:240px;
-      object-fit:contain;
-    }
-
-    /* Floating player */
     .playerFab{
-      position: fixed;
-      right: 14px;
-      bottom: 14px;
-      z-index: 60;
-      display: flex;
-      flex-direction: column;
-      align-items: flex-end;
-      gap: 10px;
+      position: fixed; right: 14px; bottom: 14px; z-index: 60;
+      display: flex; flex-direction: column; align-items: flex-end; gap: 10px;
     }
     .fabMain{
-      width: auto;
       border-radius: 999px;
       padding: 12px 14px;
       border: 1px solid var(--stroke2);
       background: rgba(18,20,27,.92);
       backdrop-filter: blur(10px);
-      display: flex;
-      align-items: center;
-      gap: 10px;
+      display: flex; align-items: center; gap: 10px;
       box-shadow: 0 14px 40px rgba(0,0,0,.35);
+      width:auto;
     }
-    .fabPct{ font-size: 12px; color: var(--muted); font-weight: 900; }
     .fabPanel{
       width: min(360px, calc(100vw - 28px));
       border-radius: 16px;
@@ -168,38 +135,28 @@
       display: none;
     }
     .fabPanel.open{ display: block; }
-    .smallBtn{ width:auto; flex:0 0 auto; padding:10px 12px; }
   </style>
 
-  <!-- DOCX -->
+  <!-- DOCX parser -->
   <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
-  <!-- PDF.js -->
-if (window.pdfjsLib) {
-  pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
-}
+
+  <!-- PDF.js core -->
   <script src="https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
-  
-  <!-- OCR -->
-  <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 </head>
 
 <body>
 <div class="app">
   <div class="topbar">
-    <div class="brand">
-      <div class="logo" aria-hidden="true"></div>
-      <div>
-        <h1>Pocket Reader</h1>
-        <div class="sub">DOCX + PDF + Scanned PDF OCR</div>
-      </div>
+    <div class="logo"></div>
+    <div>
+      <h1>Pocket Reader</h1>
+      <div class="sub">DOCX + PDF text + Gutenberg + clean errors</div>
     </div>
   </div>
 
   <div class="chipbar">
     <div class="chip active" data-tab="load">Load</div>
-    <div class="chip" data-tab="ocr">OCR</div>
-    <div class="chip" data-tab="tips">Tips</div>
+    <div class="chip" data-tab="gutenberg">Gutenberg</div>
   </div>
 
   <div class="content">
@@ -207,81 +164,38 @@ if (window.pdfjsLib) {
       <div class="hd"><span id="leftTitle">Load</span></div>
       <div class="bd">
 
-        <!-- LOAD -->
         <div class="tab" id="tab-load">
-          <div class="muted">DOCX + TXT + non-scanned PDFs (text PDFs)</div>
+          <div class="muted">Use Any File on iPhone. DOCX must be true .docx (not old .doc).</div>
           <div style="height:10px;"></div>
 
+          <div class="muted">Any File (recommended)</div>
+          <input id="anyFileInput" type="file" accept="*/*" />
+
+          <div style="height:10px;"></div>
+          <div class="muted">Filtered picker (optional)</div>
           <input id="fileInput" type="file"
             accept=".txt,.text,.md,.html,.htm,.docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+
           <div id="fileStatus" class="status"></div>
 
           <div style="height:14px;"></div>
           <div class="muted">Or paste text:</div>
           <textarea id="pasteBox" placeholder="Paste text here..."></textarea>
-
           <div class="row" style="margin-top:8px;">
             <button id="usePaste" class="primary">Load pasted text</button>
-            <button id="clearText">Clear</button>
+            <button id="clearText" class="ghost">Clear</button>
           </div>
         </div>
 
-        <!-- OCR -->
-        <div class="tab" id="tab-ocr" style="display:none;">
-          <div class="muted">Scanned PDF OCR: pick the PDF, it auto-renders page 1, then OCR.</div>
-          <div style="height:10px;"></div>
-
-          <div class="muted">Option A: OCR an image (screenshot/photo)</div>
-          <input id="imgInput" type="file" accept="image/*,.png,.jpg,.jpeg,.webp" />
-
-          <div style="height:12px;"></div>
-          <div class="muted">Option B: OCR a scanned PDF page</div>
-
-          <input id="pdfOcrInput" type="file" accept="application/pdf,.pdf" />
-          <div class="tiny" style="margin-top:6px;">
-            If iPhone won’t show your PDFs above, use the Any File picker.
-          </div>
-          <input id="anyFileInput" type="file" accept="*/*" />
-
-          <div id="pickDebug" class="status"></div>
-
+        <div class="tab" id="tab-gutenberg" style="display:none;">
+          <div class="muted">Search Project Gutenberg (via Gutendex). Load into reader.</div>
           <div style="height:10px;"></div>
           <div class="row">
-            <label class="muted" style="flex:1;">
-              PDF page
-              <input id="pdfPage" type="number" min="1" value="1" />
-            </label>
-            <button id="renderPdfPage" class="ghost smallBtn">Render</button>
+            <input id="gbQuery" type="text" placeholder="Search title or author" />
+            <button id="gbSearch" class="primary" style="width:auto;">Search</button>
           </div>
-
-          <div class="row" style="margin-top:8px;">
-            <select id="ocrLang">
-              <option value="eng" selected>English</option>
-              <option value="spa">Spanish</option>
-              <option value="fra">French</option>
-              <option value="deu">German</option>
-            </select>
-            <button id="runOcr" class="primary">Run OCR</button>
-          </div>
-
-          <div style="height:10px;"></div>
-          <canvas id="pdfCanvas" style="display:none;"></canvas>
-          <img id="ocrPreview" class="previewImg" alt="OCR preview" style="display:none;" />
-
-          <div id="ocrStatus" class="status"></div>
-
-          <div class="row" style="margin-top:8px;">
-            <button id="ocrToReader" class="ghost">Load OCR text into Reader</button>
-            <button id="ocrSpeak" class="primary">Load + Speak</button>
-          </div>
-        </div>
-
-        <!-- TIPS -->
-        <div class="tab" id="tab-tips" style="display:none;">
-          <div class="muted" style="line-height:1.6;">
-            <b>If “Render” does nothing:</b> the PDF was never actually loaded by iOS. Use Any File picker and make sure the PDF is stored <b>On My iPhone</b> (not only in iCloud).<br/><br/>
-            <b>If DOCX won’t open:</b> your current build dropped Mammoth parsing. This version restores it.
-          </div>
+          <div id="gbStatus" class="status"></div>
+          <div id="gbResults" class="status" style="white-space:normal;"></div>
         </div>
 
       </div>
@@ -293,16 +207,7 @@ if (window.pdfjsLib) {
         <span class="muted" id="modeLabel">mode: text</span>
       </div>
       <div class="bd">
-        <div class="muted">Tap a sentence to jump.</div>
-
-        <div class="progressWrap">
-          <div class="progressBar"><div id="progressFill" class="progressFill"></div></div>
-          <div id="progressText" class="muted" style="margin-top:6px;">0%</div>
-        </div>
-
-        <div style="height:10px;"></div>
         <div id="reader">Load something, then tap ▶ to speak.</div>
-
         <div id="ttsStatus" class="status"></div>
       </div>
     </section>
@@ -311,30 +216,17 @@ if (window.pdfjsLib) {
   <div class="playerFab">
     <button class="fabMain" id="fabToggle" aria-label="Toggle player">
       <span id="fabIcon">▶</span>
-      <span id="fabPct" class="fabPct">0%</span>
+      <span class="muted" id="fabVoice">Voice</span>
     </button>
 
-    <div class="fabPanel" id="fabPanel" aria-hidden="true">
-      <div class="row" style="gap:8px; margin-bottom:10px;">
-        <select id="voiceSelect" aria-label="Voice"></select>
-      </div>
-      <div class="row" style="gap:8px;">
+    <div class="fabPanel" id="fabPanel">
+      <select id="voiceSelect"></select>
+      <div class="row" style="margin-top:10px;">
         <button id="speak" class="primary" style="width:auto;">▶ Speak</button>
         <button id="pause" class="ghost" style="width:auto;">⏸</button>
         <button id="resume" class="ghost" style="width:auto;">⏵</button>
-        <button id="stop" class="danger" style="width:auto;">■</button>
+        <button id="stop" class="ghost" style="width:auto;">■</button>
       </div>
-      <div class="row" style="gap:12px; margin-top:10px; align-items:center;">
-        <label class="muted" style="display:flex; gap:8px; align-items:center; flex:1;">
-          <input id="highlightToggle" type="checkbox" style="width:auto;" checked />
-          Highlight
-        </label>
-        <label class="muted" style="display:flex; gap:8px; align-items:center; flex:1;">
-          <input id="setStartMode" type="checkbox" style="width:auto;" />
-          Set Start Here
-        </label>
-      </div>
-
       <div style="height:10px;"></div>
       <div class="muted">Rate</div>
       <input id="rate" type="range" min="0.7" max="1.2" value="1.0" step="0.05" />
@@ -346,12 +238,17 @@ if (window.pdfjsLib) {
 </div>
 
 <script>
+  // ---- PDF.js worker MUST be set inside script (here) ----
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
+  }
+
   // Tabs
   const chips = [...document.querySelectorAll(".chip")];
   const tabs = {
     load: document.getElementById("tab-load"),
-    ocr: document.getElementById("tab-ocr"),
-    tips: document.getElementById("tab-tips"),
+    gutenberg: document.getElementById("tab-gutenberg"),
   };
   const leftTitle = document.getElementById("leftTitle");
   function setTab(name){
@@ -361,172 +258,193 @@ if (window.pdfjsLib) {
   }
   chips.forEach(c => c.addEventListener("click", () => setTab(c.dataset.tab)));
 
-  // PDF worker
-  if (window.pdfjsLib) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
-  }
+  // DOM
+  const fileInput = document.getElementById("fileInput");
+  const anyFileInput = document.getElementById("anyFileInput");
+  const fileStatus = document.getElementById("fileStatus");
 
-  // Status helper
+  const reader = document.getElementById("reader");
+  const docLabel = document.getElementById("docLabel");
+  const modeLabel = document.getElementById("modeLabel");
+  const ttsStatus = document.getElementById("ttsStatus");
+
+  const voiceSelect = document.getElementById("voiceSelect");
+  const rate = document.getElementById("rate");
+  const pitch = document.getElementById("pitch");
+  const fabToggle = document.getElementById("fabToggle");
+  const fabPanel = document.getElementById("fabPanel");
+  const fabVoice = document.getElementById("fabVoice");
+  const fabIcon = document.getElementById("fabIcon");
+
   function setStatus(el, msg, kind="ok"){
     el.textContent = msg || "";
     el.className = "status " + (kind==="warn" ? "warn" : (kind==="danger" ? "dangerText" : ""));
   }
 
-  // Load tab DOM
-  const fileInput = document.getElementById("fileInput");
-  const fileStatus = document.getElementById("fileStatus");
-  const pasteBox = document.getElementById("pasteBox");
-  document.getElementById("usePaste").addEventListener("click", () => loadText(pasteBox.value || "", "Pasted text", "text"));
-  document.getElementById("clearText").addEventListener("click", () => { pasteBox.value=""; loadText("", "Cleared", "text"); });
+  // Reader state (simple)
+  const state = { textRaw:"", voices:[] };
 
-  // Reader DOM
-  const reader = document.getElementById("reader");
-  const docLabel = document.getElementById("docLabel");
-  const modeLabel = document.getElementById("modeLabel");
-  const progressFill = document.getElementById("progressFill");
-  const progressText = document.getElementById("progressText");
-  const ttsStatus = document.getElementById("ttsStatus");
+  function loadText(text, label){
+    state.textRaw = (text || "").trim();
+    docLabel.textContent = label || "Reader";
+    modeLabel.textContent = "mode: text";
+    reader.textContent = state.textRaw || "No text loaded.";
+  }
 
-  // Player DOM
-  const voiceSelect = document.getElementById("voiceSelect");
-  const rate = document.getElementById("rate");
-  const pitch = document.getElementById("pitch");
-  const highlightToggle = document.getElementById("highlightToggle");
-  const setStartMode = document.getElementById("setStartMode");
-  const speakBtn = document.getElementById("speak");
-  const pauseBtn = document.getElementById("pause");
-  const resumeBtn = document.getElementById("resume");
-  const stopBtn = document.getElementById("stop");
-  const fabToggle = document.getElementById("fabToggle");
-  const fabPanel = document.getElementById("fabPanel");
-  const fabIcon = document.getElementById("fabIcon");
-  const fabPct = document.getElementById("fabPct");
+  // DOCX
+  async function docxToText(arrayBuffer){
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return (result && result.value ? result.value : "").replace(/\n{3,}/g, "\n\n").trim();
+  }
 
+  // PDF (text extraction)
+  async function pdfToText(arrayBuffer){
+    const bytes = new Uint8Array(arrayBuffer);
+
+    const loadingTask = pdfjsLib.getDocument({
+      data: bytes,
+      disableAutoFetch: true,
+      disableStream: true,
+      disableRange: true,
+      stopAtErrors: false,
+      verbosity: 0
+    });
+
+    loadingTask.onPassword = (updatePassword) => {
+      const pw = prompt("This PDF is password-protected. Enter password:");
+      if (pw) updatePassword(pw);
+    };
+
+    const pdf = await loadingTask.promise;
+
+    let out = [];
+    for (let p = 1; p <= pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      const pageText = tc.items.map(it => it.str).join(" ");
+      out.push(pageText);
+    }
+    return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
+  }
+
+  async function handleFile(f){
+    if (!f) return;
+
+    setStatus(fileStatus,
+      `Picked:\nName: ${f.name || "(no name)"}\nType: ${f.type || "(blank)"}\nSize: ${(f.size/1024).toFixed(0)} KB`,
+      "ok"
+    );
+
+    const lower = (f.name || "").toLowerCase();
+
+    try{
+      // DOCX
+      if (lower.endsWith(".docx") || (f.type||"").includes("wordprocessingml")){
+        const text = await docxToText(await f.arrayBuffer());
+        loadText(text, `DOCX: ${f.name}`);
+        setStatus(fileStatus, "Loaded DOCX successfully.", "ok");
+        return;
+      }
+
+      // PDF
+      if (lower.endsWith(".pdf") || (f.type||"").includes("pdf")){
+        const text = await pdfToText(await f.arrayBuffer());
+        if (!text || text.length < 20){
+          setStatus(fileStatus, "PDF opened, but it has no extractable text (likely scanned). OCR is next (not included in this build).", "warn");
+          loadText("", `PDF (no text): ${f.name}`);
+        } else {
+          loadText(text, `PDF: ${f.name}`);
+          setStatus(fileStatus, "Loaded PDF text successfully.", "ok");
+        }
+        return;
+      }
+
+      // Text fallback
+      const raw = await f.text();
+      loadText(raw, `File: ${f.name}`);
+      setStatus(fileStatus, "Loaded as text.", "ok");
+    } catch(err){
+      console.error(err);
+      setStatus(fileStatus, `Open failed:\n${err?.message || String(err)}`, "danger");
+    }
+  }
+
+  fileInput.addEventListener("change", e => handleFile(e.target.files && e.target.files[0]));
+  anyFileInput.addEventListener("change", e => handleFile(e.target.files && e.target.files[0]));
+
+  // Paste
+  document.getElementById("usePaste").addEventListener("click", () => {
+    loadText(document.getElementById("pasteBox").value || "", "Pasted text");
+  });
+  document.getElementById("clearText").addEventListener("click", () => {
+    document.getElementById("pasteBox").value = "";
+    loadText("", "Cleared");
+  });
+
+  // Gutenberg
+  const gbQuery = document.getElementById("gbQuery");
+  const gbSearch = document.getElementById("gbSearch");
+  const gbStatus = document.getElementById("gbStatus");
+  const gbResults = document.getElementById("gbResults");
+
+  function esc(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+
+  async function gutenbergSearch(q){
+    gbResults.innerHTML = "";
+    gbStatus.textContent = "Searching…";
+    const url = `https://gutendex.com/books/?search=${encodeURIComponent(q)}`;
+    const r = await fetch(url);
+    if (!r.ok) throw new Error("Search failed");
+    const data = await r.json();
+    gbStatus.textContent = `Found ${data.results.length} results (showing up to 10).`;
+
+    const top = data.results.slice(0,10);
+    gbResults.innerHTML = top.map(b => {
+      const title = esc(b.title);
+      const author = esc((b.authors && b.authors[0] && b.authors[0].name) ? b.authors[0].name : "Unknown");
+      const txt = b.formats?.["text/plain; charset=utf-8"] || b.formats?.["text/plain"] || "";
+      const html = b.formats?.["text/html; charset=utf-8"] || b.formats?.["text/html"] || "";
+      const best = txt || html;
+      const btn = best ? `<button data-url="${esc(best)}" class="primary" style="margin-top:6px;">Load</button>` : `<div class="muted">No text format available.</div>`;
+      return `
+        <div style="border:1px solid #2b3150;border-radius:12px;padding:10px;margin-top:10px;background:#0f1220;">
+          <div style="font-weight:900;">${title}</div>
+          <div class="muted" style="font-size:11px;">${author}</div>
+          ${btn}
+        </div>
+      `;
+    }).join("");
+  }
+
+  gbSearch.addEventListener("click", async () => {
+    const q = (gbQuery.value || "").trim();
+    if (!q) return;
+    try{ await gutenbergSearch(q); }
+    catch(e){ gbStatus.textContent = "Gutenberg search failed. Check your connection."; }
+  });
+
+  gbResults.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-url]");
+    if (!btn) return;
+    const url = btn.getAttribute("data-url");
+    gbStatus.textContent = "Downloading…";
+    try{
+      const r = await fetch(url);
+      const text = await r.text();
+      loadText(text, "Gutenberg book");
+      gbStatus.textContent = "Loaded into Reader.";
+      setTab("load");
+    } catch(e){
+      gbStatus.textContent = "Could not download that book format.";
+    }
+  });
+
+  // TTS UI
   let panelOpen = false;
   fabToggle.addEventListener("click", () => {
     panelOpen = !panelOpen;
     fabPanel.classList.toggle("open", panelOpen);
   });
-
-  // Reader state
-  const state = {
-    label: "Loaded",
-    mode: "text",
-    textRaw: "",
-    sentences: [],
-    sentenceEls: [],
-    currentSentenceIndex: 0,
-    voices: [],
-    speaking: false,
-  };
-
-  function setDocTitle(label, mode){
-    docLabel.textContent = label || "Reader";
-    modeLabel.textContent = "mode: " + (mode || "text");
-  }
-
-  function splitIntoSentences(text){
-    const t = (text || "").replace(/\r\n/g, "\n").trim();
-    if (!t) return [];
-    const parts = t.split(/(?<=[.!?])\s+(?=[A-Z0-9“"'\(\[])/g);
-    return parts.map(s => s.trim()).filter(Boolean);
-  }
-
-  function renderReaderWithSentences(sentences){
-    reader.innerHTML = "";
-    state.sentenceEls = [];
-    if (!sentences.length) { reader.textContent = "No text loaded."; return; }
-    const frag = document.createDocumentFragment();
-    sentences.forEach((s, idx) => {
-      const span = document.createElement("span");
-      span.className = "sent";
-      span.dataset.idx = String(idx);
-      span.textContent = s + " ";
-      state.sentenceEls[idx] = span;
-      frag.appendChild(span);
-    });
-    reader.appendChild(frag);
-  }
-
-  function clearActiveHighlight(){
-    for (const el of state.sentenceEls) if (el) el.classList.remove("active");
-  }
-  function setActiveHighlight(i){
-    if (!highlightToggle.checked) return;
-    clearActiveHighlight();
-    const el = state.sentenceEls[i];
-    if (!el) return;
-    el.classList.add("active");
-    try { el.scrollIntoView({ block:"center", behavior:"smooth" }); } catch(e){}
-  }
-
-  function updateProgress(){
-    const total = state.sentences.length || 0;
-    const idx = Math.max(0, Math.min(state.currentSentenceIndex, Math.max(0, total-1)));
-    const pct = total ? Math.round((idx / total) * 100) : 0;
-    progressFill.style.width = pct + "%";
-    progressText.textContent = total ? `${pct}% (sentence ${idx+1} of ${total})` : "0%";
-    fabPct.textContent = total ? `${pct}%` : "0%";
-  }
-
-  function stopSpeaking(){
-    try { speechSynthesis.cancel(); } catch(e) {}
-    state.speaking = false;
-    setStatus(ttsStatus, "");
-    clearActiveHighlight();
-    fabIcon.textContent = "▶";
-  }
-
-  function getSelectedVoice(){
-    const name = voiceSelect.value;
-    return state.voices.find(v => v.name === name) || null;
-  }
-
-  function speakFrom(index){
-    if (!state.textRaw.trim()) { setStatus(ttsStatus, "No text loaded.", "warn"); return; }
-    stopSpeaking();
-    state.speaking = true;
-    state.currentSentenceIndex = Math.max(0, Math.min(index, state.sentences.length - 1));
-    updateProgress();
-    fabIcon.textContent = "⏸";
-    speakNextSentence();
-  }
-
-  function speakNextSentence(){
-    if (!state.speaking) return;
-    if (state.currentSentenceIndex >= state.sentences.length){
-      state.speaking = false;
-      setStatus(ttsStatus, "Finished.", "ok");
-      clearActiveHighlight();
-      fabIcon.textContent = "▶";
-      return;
-    }
-    const s = state.sentences[state.currentSentenceIndex];
-    const voice = getSelectedVoice();
-
-    setActiveHighlight(state.currentSentenceIndex);
-    updateProgress();
-
-    const u = new SpeechSynthesisUtterance(s);
-    if (voice) u.voice = voice;
-    u.rate = parseFloat(rate.value);
-    u.pitch = parseFloat(pitch.value);
-
-    u.onstart = () => setStatus(ttsStatus, `Speaking ${state.currentSentenceIndex+1}/${state.sentences.length} • ${state.label}`, "ok");
-    u.onerror = () => {
-      state.speaking = false;
-      setStatus(ttsStatus, "Speech error. Try another voice.", "warn");
-      clearActiveHighlight();
-      fabIcon.textContent = "▶";
-    };
-    u.onend = () => {
-      state.currentSentenceIndex += 1;
-      speakNextSentence();
-    };
-
-    speechSynthesis.speak(u);
-  }
 
   function populateVoices(){
     const vs = speechSynthesis.getVoices();
@@ -539,276 +457,45 @@ if (window.pdfjsLib) {
       if (aUS !== bUS) return bUS - aUS;
       return (a.name || "").localeCompare(b.name || "");
     });
-    for (const v of sorted){
+    sorted.forEach(v => {
       const opt = document.createElement("option");
       opt.value = v.name;
-      opt.textContent = `${v.name} — ${v.lang}${v.default ? " (default)" : ""}`;
+      opt.textContent = `${v.name} — ${v.lang}`;
       voiceSelect.appendChild(opt);
-    }
-    const preferred = sorted.find(v => (v.lang || "").toLowerCase().includes("en-us"))?.name || sorted[0]?.name;
+    });
+    const preferred = sorted.find(v => (v.lang||"").toLowerCase().includes("en-us"))?.name || sorted[0]?.name;
     if (preferred) voiceSelect.value = preferred;
+    fabVoice.textContent = "Voice ready";
   }
 
-  function loadText(text, label, mode="text"){
-    stopSpeaking();
-    state.mode = mode;
-    state.label = label || "Loaded";
-    state.textRaw = text || "";
-    state.sentences = splitIntoSentences(state.textRaw);
-    state.currentSentenceIndex = 0;
-    renderReaderWithSentences(state.sentences);
-    setDocTitle(state.label, state.mode);
-    setActiveHighlight(0);
-    updateProgress();
-  }
+  function stopSpeak(){ try{ speechSynthesis.cancel(); } catch(e){} fabIcon.textContent="▶"; }
 
-  reader.addEventListener("click", (e) => {
-    const sent = e.target.closest(".sent");
-    if (!sent) return;
-    const idx = parseInt(sent.dataset.idx, 10);
-    if (Number.isNaN(idx)) return;
-    state.currentSentenceIndex = idx;
-    setActiveHighlight(idx);
-    updateProgress();
-    if (!setStartMode.checked) speakFrom(idx);
-    else setStatus(ttsStatus, "Start point set. Press Speak.", "ok");
-  });
-
-  speakBtn.addEventListener("click", () => speakFrom(state.currentSentenceIndex || 0));
-  pauseBtn.addEventListener("click", () => { try { speechSynthesis.pause(); } catch(e){} fabIcon.textContent="▶"; });
-  resumeBtn.addEventListener("click", () => { try { speechSynthesis.resume(); } catch(e){} fabIcon.textContent="⏸"; });
-  stopBtn.addEventListener("click", stopSpeaking);
-
-  // --------- DOCX + PDF (Load tab) ----------
- async function pdfToText(arrayBuffer){
-  const bytes = new Uint8Array(arrayBuffer);
-
-  const loadingTask = pdfjsLib.getDocument({
-    data: bytes,
-    disableAutoFetch: true,
-    disableStream: true,
-    disableRange: true,
-    stopAtErrors: false,
-    verbosity: 0
-  });
-
-  loadingTask.onPassword = (updatePassword) => {
-    const pw = prompt("This PDF is password-protected. Enter password:");
-    if (pw) updatePassword(pw);
-  };
-
-  const pdf = await loadingTask.promise;
-
-  let out = [];
-  for (let p = 1; p <= pdf.numPages; p++){
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-    const pageText = tc.items.map(it => it.str).join(" ");
-    out.push(pageText);
-  }
-  return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
-}
-
-
-  fileInput.addEventListener("change", async (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-
-    const lower = (f.name || "").toLowerCase();
-    setStatus(fileStatus, `Picked: ${f.name}\nType: ${f.type || "(blank)"}\nSize: ${(f.size/1024/1024).toFixed(2)} MB`, "ok");
-
-    try{
-      if (lower.endsWith(".docx") || (f.type || "").includes("wordprocessingml")){
-        const text = await docxToText(await f.arrayBuffer());
-        loadText(text, `DOCX: ${f.name}`, "text");
-        setStatus(fileStatus, `Loaded DOCX: ${f.name}`, "ok");
-        return;
-      }
-
-      if (lower.endsWith(".pdf") || (f.type || "").includes("pdf")){
-        const text = await pdfToText(await f.arrayBuffer());
-        if (!text || text.length < 20){
-          setStatus(fileStatus, "This PDF looks scanned (no extractable text). Use the OCR tab for scanned PDFs.", "warn");
-          loadText("", `PDF (scanned): ${f.name}`, "text");
-        } else {
-          loadText(text, `PDF: ${f.name}`, "text");
-          setStatus(fileStatus, `Loaded PDF text: ${f.name}`, "ok");
-        }
-        return;
-      }
-
-      const raw = await f.text();
-      loadText(raw, `File: ${f.name}`, "text");
-      setStatus(fileStatus, `Loaded file: ${f.name}`, "ok");
-    } catch (err) {
-  console.error(err);
-  setStatus(fileStatus, `PDF failed:\n${err?.message || String(err)}`, "danger");
-}
- finally {
-      fileInput.value = "";
-    }
-  });
-
-  // --------- OCR tab ----------
-  const imgInput = document.getElementById("imgInput");
-  const pdfOcrInput = document.getElementById("pdfOcrInput");
-  const anyFileInput = document.getElementById("anyFileInput");
-  const pickDebug = document.getElementById("pickDebug");
-  const pdfPage = document.getElementById("pdfPage");
-  const renderPdfPageBtn = document.getElementById("renderPdfPage");
-  const pdfCanvas = document.getElementById("pdfCanvas");
-  const ocrLang = document.getElementById("ocrLang");
-  const runOcr = document.getElementById("runOcr");
-  const ocrPreview = document.getElementById("ocrPreview");
-  const ocrStatus = document.getElementById("ocrStatus");
-  const ocrToReader = document.getElementById("ocrToReader");
-  const ocrSpeak = document.getElementById("ocrSpeak");
-
-  let ocrText = "";
-  let imageURL = "";
-  let loadedPdfBytes = null;
-  let renderedDataURL = "";
-  let pdfNumPages = 0;
-
-  function debugPicked(file, label){
-    if (!file) return;
-    setStatus(pickDebug,
-      `Picked via: ${label}\nName: ${file.name || "(no name)"}\nType: ${file.type || "(blank)"}\nSize: ${(file.size/1024/1024).toFixed(2)} MB`,
-      "ok"
-    );
-  }
-
-  imgInput.addEventListener("change", (e) => {
-    const f = e.target.files && e.target.files[0];
-    debugPicked(f, "Image picker");
-    if (!f) return;
-    if (imageURL) URL.revokeObjectURL(imageURL);
-    imageURL = URL.createObjectURL(f);
-    renderedDataURL = "";
-    ocrPreview.src = imageURL;
-    ocrPreview.style.display = "block";
-    ocrText = "";
-    setStatus(ocrStatus, "Image loaded. Tap Run OCR.", "ok");
-  });
-
-  async function handlePdfPick(file, label){
-    debugPicked(file, label);
-    if (!file) return;
-
-    const lower = (file.name || "").toLowerCase();
-    const type = (file.type || "").toLowerCase();
-    const isPdf = type.includes("pdf") || lower.endsWith(".pdf");
-
-    if (!isPdf){
-      setStatus(ocrStatus, "That isn’t a PDF. Pick a .pdf file.", "warn");
-      loadedPdfBytes = null;
-      pdfNumPages = 0;
-      renderedDataURL = "";
+  function speakAll(){
+    if (!state.textRaw.trim()){
+      setStatus(ttsStatus, "No text loaded.", "warn");
       return;
     }
+    stopSpeak();
+    fabIcon.textContent="⏸";
+    const v = state.voices.find(x => x.name === voiceSelect.value) || null;
 
-    try{
-      loadedPdfBytes = await file.arrayBuffer();
-      const pdf = await pdfjsLib.getDocument({ data: loadedPdfBytes }).promise;
-      pdfNumPages = pdf.numPages;
-      pdfPage.max = String(pdfNumPages);
-      if (parseInt(pdfPage.value,10) > pdfNumPages) pdfPage.value = "1";
-      setStatus(ocrStatus, `PDF loaded (${pdfNumPages} pages). Auto-rendering page 1…`, "ok");
-
-      // Auto-render page 1 immediately so you can OCR without extra steps
-      await renderPdfPage(1);
-    } catch(err){
-      console.error(err);
-      setStatus(ocrStatus, "Could not open that PDF. If it’s huge, try a smaller one.", "warn");
-      loadedPdfBytes = null;
-      pdfNumPages = 0;
-      renderedDataURL = "";
-    }
+    const u = new SpeechSynthesisUtterance(state.textRaw);
+    if (v) u.voice = v;
+    u.rate = parseFloat(rate.value);
+    u.pitch = parseFloat(pitch.value);
+    u.onend = () => { fabIcon.textContent="▶"; };
+    u.onerror = () => { setStatus(ttsStatus, "Speech error. Try another voice.", "warn"); fabIcon.textContent="▶"; };
+    speechSynthesis.speak(u);
   }
 
-  pdfOcrInput.addEventListener("change", (e) => handlePdfPick(e.target.files && e.target.files[0], "PDF picker"));
-  anyFileInput.addEventListener("change", (e) => handlePdfPick(e.target.files && e.target.files[0], "Any File picker"));
+  document.getElementById("speak").addEventListener("click", speakAll);
+  document.getElementById("pause").addEventListener("click", () => { try{ speechSynthesis.pause(); } catch(e){} fabIcon.textContent="▶"; });
+  document.getElementById("resume").addEventListener("click", () => { try{ speechSynthesis.resume(); } catch(e){} fabIcon.textContent="⏸"; });
+  document.getElementById("stop").addEventListener("click", stopSpeak);
 
-  async function renderPdfPage(pageNum){
-    if (!loadedPdfBytes){
-      setStatus(ocrStatus, "No PDF loaded yet. Pick a PDF first.", "warn");
-      return;
-    }
-
-    const pdf = await pdfjsLib.getDocument({ data: loadedPdfBytes }).promise;
-    const p = Math.max(1, Math.min(pageNum, pdf.numPages));
-    const page = await pdf.getPage(p);
-
-    // scale: 2 is good quality; if it crashes, drop to 1.5
-    const viewport = page.getViewport({ scale: 2.0 });
-    const ctx = pdfCanvas.getContext("2d", { willReadFrequently: true });
-    pdfCanvas.width = Math.floor(viewport.width);
-    pdfCanvas.height = Math.floor(viewport.height);
-
-    await page.render({ canvasContext: ctx, viewport }).promise;
-
-    renderedDataURL = pdfCanvas.toDataURL("image/png");
-    ocrPreview.src = renderedDataURL;
-    ocrPreview.style.display = "block";
-    imageURL = ""; // prefer rendered pdf page now
-    setStatus(ocrStatus, `Rendered page ${p}. Tap Run OCR.`, "ok");
-  }
-
-  renderPdfPageBtn.addEventListener("click", async () => {
-    const p = Math.max(1, parseInt(pdfPage.value || "1", 10));
-    setStatus(ocrStatus, `Rendering page ${p}…`, "ok");
-    try { await renderPdfPage(p); }
-    catch(e){ console.error(e); setStatus(ocrStatus, "Render failed. Try a different page or smaller PDF.", "warn"); }
-  });
-
-  runOcr.addEventListener("click", async () => {
-    const source = renderedDataURL || imageURL;
-    if (!source){
-      setStatus(ocrStatus, "Upload an image OR pick a PDF (it will auto-render page 1) first.", "warn");
-      return;
-    }
-
-    setStatus(ocrStatus, "OCR running…", "ok");
-
-    try{
-      const { data } = await Tesseract.recognize(source, ocrLang.value, {
-        logger: m => {
-          if (m.status && typeof m.progress === "number") {
-            const pct = Math.round(m.progress * 100);
-            setStatus(ocrStatus, `OCR: ${m.status} • ${pct}%`, "ok");
-          }
-        }
-      });
-      ocrText = (data && data.text ? data.text : "").trim();
-      setStatus(ocrStatus, ocrText ? `OCR complete. ${ocrText.length.toLocaleString()} chars.` : "OCR found little/no text.", ocrText ? "ok" : "warn");
-    } catch(err){
-      console.error(err);
-      setStatus(ocrStatus, "OCR failed. Try a clearer page or screenshot.", "warn");
-    }
-  });
-
-  ocrToReader.addEventListener("click", () => {
-    if (!ocrText) { setStatus(ocrStatus, "Run OCR first.", "warn"); return; }
-    loadText(ocrText, "OCR text", "text");
-  });
-
-  ocrSpeak.addEventListener("click", () => {
-    if (!ocrText) { setStatus(ocrStatus, "Run OCR first.", "warn"); return; }
-    loadText(ocrText, "OCR text", "text");
-    speakFrom(0);
-  });
-
-  // Voices init
   if (typeof speechSynthesis !== "undefined"){
     populateVoices();
     speechSynthesis.onvoiceschanged = populateVoices;
-  }
-
-  // Service worker registration
-  if ("serviceWorker" in navigator) {
-    window.addEventListener("load", () => {
-      navigator.serviceWorker.register("./sw.js").catch(() => {});
-    });
   }
 </script>
 </body>
