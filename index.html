@@ -318,7 +318,7 @@ async function pdfToText(arrayBuffer){
 
   // worker
   window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-    "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
+  "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/legacy/build/pdf.worker.min.js";
 
   const bytes = new Uint8Array(arrayBuffer);
 
@@ -546,12 +546,11 @@ if (typeof speechSynthesis !== "undefined"){
     console.warn(e);
   }
 
-  try{
-    // PDF.js
+   try{
+    // PDF.js (legacy build with .js files)
     await loadScriptSequential(
       [
-        "https://cdn.jsdelivr.net/npm/pdfjs-dist@4.10.38/build/pdf.min.js",
-        "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.js"
+        "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/legacy/build/pdf.min.js"
       ],
       () => typeof window.pdfjsLib !== "undefined",
       "PDF engine"
@@ -559,6 +558,7 @@ if (typeof speechSynthesis !== "undefined"){
   } catch(e){
     console.warn(e);
   }
+
 
   setBanner(true, typeof window.mammoth !== "undefined", typeof window.pdfjsLib !== "undefined");
 })();
