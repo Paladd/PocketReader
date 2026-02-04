@@ -17,6 +17,7 @@
     }
     body{ margin:0; background:var(--bg); color:var(--text); }
     .app{ min-height:100vh; display:grid; grid-template-rows:auto auto 1fr; }
+
     .topbar{
       position:sticky; top:0; z-index:50;
       background:rgba(18,20,27,.9); backdrop-filter: blur(10px);
@@ -167,12 +168,14 @@
       display: none;
     }
     .fabPanel.open{ display: block; }
-
     .smallBtn{ width:auto; flex:0 0 auto; padding:10px 12px; }
   </style>
 
+  <!-- DOCX -->
   <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
+  <!-- PDF.js -->
   <script src="https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
+  <!-- OCR -->
   <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 </head>
 
@@ -183,7 +186,7 @@
       <div class="logo" aria-hidden="true"></div>
       <div>
         <h1>Pocket Reader</h1>
-        <div class="sub">Fixing iPhone PDF picking + OCR</div>
+        <div class="sub">DOCX + PDF + Scanned PDF OCR</div>
       </div>
     </div>
   </div>
@@ -199,8 +202,9 @@
       <div class="hd"><span id="leftTitle">Load</span></div>
       <div class="bd">
 
+        <!-- LOAD -->
         <div class="tab" id="tab-load">
-          <div class="muted">Load text PDFs (not scanned), DOCX, TXT.</div>
+          <div class="muted">DOCX + TXT + non-scanned PDFs (text PDFs)</div>
           <div style="height:10px;"></div>
 
           <input id="fileInput" type="file"
@@ -217,8 +221,9 @@
           </div>
         </div>
 
+        <!-- OCR -->
         <div class="tab" id="tab-ocr" style="display:none;">
-          <div class="muted">If your PDF is scanned, use the PDF OCR flow below.</div>
+          <div class="muted">Scanned PDF OCR: pick the PDF, it auto-renders page 1, then OCR.</div>
           <div style="height:10px;"></div>
 
           <div class="muted">Option A: OCR an image (screenshot/photo)</div>
@@ -227,14 +232,10 @@
           <div style="height:12px;"></div>
           <div class="muted">Option B: OCR a scanned PDF page</div>
 
-          <!-- Strict PDF picker -->
           <input id="pdfOcrInput" type="file" accept="application/pdf,.pdf" />
-
           <div class="tiny" style="margin-top:6px;">
-            If iPhone still won’t show your PDF here, use the “Any File” picker below (iOS workaround).
+            If iPhone won’t show your PDFs above, use the Any File picker.
           </div>
-
-          <!-- iOS workaround: accept anything -->
           <input id="anyFileInput" type="file" accept="*/*" />
 
           <div id="pickDebug" class="status"></div>
@@ -270,11 +271,11 @@
           </div>
         </div>
 
+        <!-- TIPS -->
         <div class="tab" id="tab-tips" style="display:none;">
           <div class="muted" style="line-height:1.6;">
-            If the app “doesn’t recognize” your scanned PDF, it’s almost always the iPhone picker not returning a PDF File object.<br/><br/>
-            Use the <b>Any File</b> picker. Then the debug panel will show the file name/type/size the browser returned.<br/><br/>
-            If the type comes through as blank, we still accept it if the name ends with .pdf.
+            <b>If “Render” does nothing:</b> the PDF was never actually loaded by iOS. Use Any File picker and make sure the PDF is stored <b>On My iPhone</b> (not only in iCloud).<br/><br/>
+            <b>If DOCX won’t open:</b> your current build dropped Mammoth parsing. This version restores it.
           </div>
         </div>
 
@@ -361,15 +362,20 @@
       "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
   }
 
-  const fileStatus = document.getElementById("fileStatus");
-  const pickDebug = document.getElementById("pickDebug");
-
+  // Status helper
   function setStatus(el, msg, kind="ok"){
     el.textContent = msg || "";
     el.className = "status " + (kind==="warn" ? "warn" : (kind==="danger" ? "dangerText" : ""));
   }
 
-  // Reader state + minimal TTS
+  // Load tab DOM
+  const fileInput = document.getElementById("fileInput");
+  const fileStatus = document.getElementById("fileStatus");
+  const pasteBox = document.getElementById("pasteBox");
+  document.getElementById("usePaste").addEventListener("click", () => loadText(pasteBox.value || "", "Pasted text", "text"));
+  document.getElementById("clearText").addEventListener("click", () => { pasteBox.value=""; loadText("", "Cleared", "text"); });
+
+  // Reader DOM
   const reader = document.getElementById("reader");
   const docLabel = document.getElementById("docLabel");
   const modeLabel = document.getElementById("modeLabel");
@@ -377,17 +383,16 @@
   const progressText = document.getElementById("progressText");
   const ttsStatus = document.getElementById("ttsStatus");
 
+  // Player DOM
   const voiceSelect = document.getElementById("voiceSelect");
   const rate = document.getElementById("rate");
   const pitch = document.getElementById("pitch");
   const highlightToggle = document.getElementById("highlightToggle");
   const setStartMode = document.getElementById("setStartMode");
-
   const speakBtn = document.getElementById("speak");
   const pauseBtn = document.getElementById("pause");
   const resumeBtn = document.getElementById("resume");
   const stopBtn = document.getElementById("stop");
-
   const fabToggle = document.getElementById("fabToggle");
   const fabPanel = document.getElementById("fabPanel");
   const fabIcon = document.getElementById("fabIcon");
@@ -399,6 +404,7 @@
     fabPanel.classList.toggle("open", panelOpen);
   });
 
+  // Reader state
   const state = {
     label: "Loaded",
     mode: "text",
@@ -549,7 +555,6 @@
     setDocTitle(state.label, state.mode);
     setActiveHighlight(0);
     updateProgress();
-    setStatus(fileStatus, state.textRaw.trim() ? `${label} (${state.textRaw.length.toLocaleString()} chars)` : "No text loaded.", state.textRaw.trim() ? "ok" : "warn");
   }
 
   reader.addEventListener("click", (e) => {
@@ -569,10 +574,67 @@
   resumeBtn.addEventListener("click", () => { try { speechSynthesis.resume(); } catch(e){} fabIcon.textContent="⏸"; });
   stopBtn.addEventListener("click", stopSpeaking);
 
-  // OCR wiring
+  // --------- DOCX + PDF (Load tab) ----------
+  async function docxToText(arrayBuffer){
+    const result = await mammoth.extractRawText({ arrayBuffer });
+    return (result && result.value ? result.value : "").replace(/\n{3,}/g, "\n\n").trim();
+  }
+
+  async function pdfToText(arrayBuffer){
+    const pdf = await pdfjsLib.getDocument({ data: arrayBuffer }).promise;
+    let out = [];
+    for (let p = 1; p <= pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      const pageText = tc.items.map(it => it.str).join(" ");
+      out.push(pageText);
+    }
+    return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
+  }
+
+  fileInput.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+
+    const lower = (f.name || "").toLowerCase();
+    setStatus(fileStatus, `Picked: ${f.name}\nType: ${f.type || "(blank)"}\nSize: ${(f.size/1024/1024).toFixed(2)} MB`, "ok");
+
+    try{
+      if (lower.endsWith(".docx") || (f.type || "").includes("wordprocessingml")){
+        const text = await docxToText(await f.arrayBuffer());
+        loadText(text, `DOCX: ${f.name}`, "text");
+        setStatus(fileStatus, `Loaded DOCX: ${f.name}`, "ok");
+        return;
+      }
+
+      if (lower.endsWith(".pdf") || (f.type || "").includes("pdf")){
+        const text = await pdfToText(await f.arrayBuffer());
+        if (!text || text.length < 20){
+          setStatus(fileStatus, "This PDF looks scanned (no extractable text). Use the OCR tab for scanned PDFs.", "warn");
+          loadText("", `PDF (scanned): ${f.name}`, "text");
+        } else {
+          loadText(text, `PDF: ${f.name}`, "text");
+          setStatus(fileStatus, `Loaded PDF text: ${f.name}`, "ok");
+        }
+        return;
+      }
+
+      const raw = await f.text();
+      loadText(raw, `File: ${f.name}`, "text");
+      setStatus(fileStatus, `Loaded file: ${f.name}`, "ok");
+    } catch(err){
+      console.error(err);
+      setStatus(fileStatus, "Could not open that file. If it’s a scanned PDF, use OCR tab.", "warn");
+    } finally {
+      fileInput.value = "";
+    }
+  });
+
+  // --------- OCR tab ----------
   const imgInput = document.getElementById("imgInput");
   const pdfOcrInput = document.getElementById("pdfOcrInput");
   const anyFileInput = document.getElementById("anyFileInput");
+  const pickDebug = document.getElementById("pickDebug");
   const pdfPage = document.getElementById("pdfPage");
   const renderPdfPageBtn = document.getElementById("renderPdfPage");
   const pdfCanvas = document.getElementById("pdfCanvas");
@@ -589,17 +651,17 @@
   let renderedDataURL = "";
   let pdfNumPages = 0;
 
-  function debugFile(file, sourceLabel){
+  function debugPicked(file, label){
     if (!file) return;
-    const name = file.name || "(no name)";
-    const type = file.type || "(blank type)";
-    const size = typeof file.size === "number" ? `${(file.size/1024/1024).toFixed(2)} MB` : "(unknown size)";
-    setStatus(pickDebug, `Picked via: ${sourceLabel}\nName: ${name}\nType: ${type}\nSize: ${size}`, "ok");
+    setStatus(pickDebug,
+      `Picked via: ${label}\nName: ${file.name || "(no name)"}\nType: ${file.type || "(blank)"}\nSize: ${(file.size/1024/1024).toFixed(2)} MB`,
+      "ok"
+    );
   }
 
   imgInput.addEventListener("change", (e) => {
     const f = e.target.files && e.target.files[0];
-    debugFile(f, "Image picker");
+    debugPicked(f, "Image picker");
     if (!f) return;
     if (imageURL) URL.revokeObjectURL(imageURL);
     imageURL = URL.createObjectURL(f);
@@ -610,19 +672,19 @@
     setStatus(ocrStatus, "Image loaded. Tap Run OCR.", "ok");
   });
 
-  async function handlePdfFile(file, sourceLabel){
-    debugFile(file, sourceLabel);
+  async function handlePdfPick(file, label){
+    debugPicked(file, label);
     if (!file) return;
 
     const lower = (file.name || "").toLowerCase();
     const type = (file.type || "").toLowerCase();
-
-    // Accept if either type says pdf OR filename ends with .pdf (iOS often leaves type blank)
     const isPdf = type.includes("pdf") || lower.endsWith(".pdf");
+
     if (!isPdf){
-      setStatus(ocrStatus, "That file is not a PDF. Use an actual .pdf file.", "warn");
+      setStatus(ocrStatus, "That isn’t a PDF. Pick a .pdf file.", "warn");
       loadedPdfBytes = null;
       pdfNumPages = 0;
+      renderedDataURL = "";
       return;
     }
 
@@ -632,61 +694,61 @@
       pdfNumPages = pdf.numPages;
       pdfPage.max = String(pdfNumPages);
       if (parseInt(pdfPage.value,10) > pdfNumPages) pdfPage.value = "1";
-      setStatus(ocrStatus, `PDF loaded (${pdfNumPages} pages). Set page number and tap Render.`, "ok");
+      setStatus(ocrStatus, `PDF loaded (${pdfNumPages} pages). Auto-rendering page 1…`, "ok");
+
+      // Auto-render page 1 immediately so you can OCR without extra steps
+      await renderPdfPage(1);
     } catch(err){
       console.error(err);
       setStatus(ocrStatus, "Could not open that PDF. If it’s huge, try a smaller one.", "warn");
       loadedPdfBytes = null;
       pdfNumPages = 0;
+      renderedDataURL = "";
     }
   }
 
-  pdfOcrInput.addEventListener("change", (e) => {
-    const f = e.target.files && e.target.files[0];
-    handlePdfFile(f, "PDF picker");
-  });
+  pdfOcrInput.addEventListener("change", (e) => handlePdfPick(e.target.files && e.target.files[0], "PDF picker"));
+  anyFileInput.addEventListener("change", (e) => handlePdfPick(e.target.files && e.target.files[0], "Any File picker"));
 
-  anyFileInput.addEventListener("change", (e) => {
-    const f = e.target.files && e.target.files[0];
-    handlePdfFile(f, "Any File picker");
-  });
-
-  renderPdfPageBtn.addEventListener("click", async () => {
+  async function renderPdfPage(pageNum){
     if (!loadedPdfBytes){
-      setStatus(ocrStatus, "No PDF loaded yet. Use PDF picker or Any File picker.", "warn");
+      setStatus(ocrStatus, "No PDF loaded yet. Pick a PDF first.", "warn");
       return;
     }
-    const pageNum = Math.max(1, parseInt(pdfPage.value || "1", 10));
-    setStatus(ocrStatus, `Rendering page ${pageNum}…`, "ok");
 
-    try{
-      const pdf = await pdfjsLib.getDocument({ data: loadedPdfBytes }).promise;
-      const p = Math.min(pageNum, pdf.numPages);
-      const page = await pdf.getPage(p);
+    const pdf = await pdfjsLib.getDocument({ data: loadedPdfBytes }).promise;
+    const p = Math.max(1, Math.min(pageNum, pdf.numPages));
+    const page = await pdf.getPage(p);
 
-      const viewport = page.getViewport({ scale: 2.0 });
-      const ctx = pdfCanvas.getContext("2d", { willReadFrequently: true });
-      pdfCanvas.width = Math.floor(viewport.width);
-      pdfCanvas.height = Math.floor(viewport.height);
+    // scale: 2 is good quality; if it crashes, drop to 1.5
+    const viewport = page.getViewport({ scale: 2.0 });
+    const ctx = pdfCanvas.getContext("2d", { willReadFrequently: true });
+    pdfCanvas.width = Math.floor(viewport.width);
+    pdfCanvas.height = Math.floor(viewport.height);
 
-      await page.render({ canvasContext: ctx, viewport }).promise;
-      renderedDataURL = pdfCanvas.toDataURL("image/png");
+    await page.render({ canvasContext: ctx, viewport }).promise;
 
-      ocrPreview.src = renderedDataURL;
-      ocrPreview.style.display = "block";
-      setStatus(ocrStatus, `Rendered page ${p}. Now tap Run OCR.`, "ok");
-    } catch(err){
-      console.error(err);
-      setStatus(ocrStatus, "Render failed. Try another page or smaller file.", "warn");
-    }
+    renderedDataURL = pdfCanvas.toDataURL("image/png");
+    ocrPreview.src = renderedDataURL;
+    ocrPreview.style.display = "block";
+    imageURL = ""; // prefer rendered pdf page now
+    setStatus(ocrStatus, `Rendered page ${p}. Tap Run OCR.`, "ok");
+  }
+
+  renderPdfPageBtn.addEventListener("click", async () => {
+    const p = Math.max(1, parseInt(pdfPage.value || "1", 10));
+    setStatus(ocrStatus, `Rendering page ${p}…`, "ok");
+    try { await renderPdfPage(p); }
+    catch(e){ console.error(e); setStatus(ocrStatus, "Render failed. Try a different page or smaller PDF.", "warn"); }
   });
 
   runOcr.addEventListener("click", async () => {
     const source = renderedDataURL || imageURL;
     if (!source){
-      setStatus(ocrStatus, "Upload an image OR load a PDF and render a page first.", "warn");
+      setStatus(ocrStatus, "Upload an image OR pick a PDF (it will auto-render page 1) first.", "warn");
       return;
     }
+
     setStatus(ocrStatus, "OCR running…", "ok");
 
     try{
@@ -699,7 +761,7 @@
         }
       });
       ocrText = (data && data.text ? data.text : "").trim();
-      setStatus(ocrStatus, ocrText ? `OCR complete. ${ocrText.length.toLocaleString()} chars.` : "OCR finished but found little/no text.", ocrText ? "ok" : "warn");
+      setStatus(ocrStatus, ocrText ? `OCR complete. ${ocrText.length.toLocaleString()} chars.` : "OCR found little/no text.", ocrText ? "ok" : "warn");
     } catch(err){
       console.error(err);
       setStatus(ocrStatus, "OCR failed. Try a clearer page or screenshot.", "warn");
@@ -717,19 +779,13 @@
     speakFrom(0);
   });
 
-  // Load tab basics
-  document.getElementById("usePaste").addEventListener("click", () => loadText(document.getElementById("pasteBox").value || "", "Loaded pasted text", "text"));
-  document.getElementById("clearText").addEventListener("click", () => { document.getElementById("pasteBox").value=""; loadText("", "Cleared", "text"); });
-
-  // Voices
+  // Voices init
   if (typeof speechSynthesis !== "undefined"){
     populateVoices();
     speechSynthesis.onvoiceschanged = populateVoices;
-  } else {
-    setStatus(ttsStatus, "SpeechSynthesis not supported in this browser.", "warn");
   }
 
-  // Service worker
+  // Service worker registration
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch(() => {});
