@@ -101,7 +101,7 @@
     .ghost{ background:transparent; }
     .danger{ background:var(--danger); border-color:var(--danger); }
 
-    .row{ display:flex; gap:8px; flex-wrap:wrap; }
+    .row{ display:flex; gap:8px; flex-wrap:wrap; align-items:center; }
     .row > *{ flex:1; }
     .muted{ color:var(--muted); font-size:12px; }
     .status{ margin-top:8px; font-size:12px; color:#9fe6b8; white-space:pre-wrap; }
@@ -173,24 +173,24 @@
     .hideFab .fabMain{ opacity: 0.15; }
     .hideFab .fabMain:hover{ opacity: 1; }
 
-    /* OCR preview */
     .previewImg{
       width:100%;
       border-radius:16px;
       border:1px solid var(--stroke);
       background:var(--panel);
-      max-height:220px;
+      max-height:240px;
       object-fit:contain;
     }
+
+    .smallBtn{ width:auto; flex:0 0 auto; padding:10px 12px; }
+    .tiny{ font-size:11px; color:var(--muted); }
   </style>
 
-  <!-- EPUB.js -->
-  <script src="https://unpkg.com/epubjs/dist/epub.min.js"></script>
-  <!-- DOCX -> text (Mammoth) -->
+  <!-- DOCX -> text -->
   <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
   <!-- PDF.js -->
   <script src="https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
-  <!-- OCR (Tesseract.js) -->
+  <!-- OCR -->
   <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 </head>
 
@@ -201,7 +201,7 @@
       <div class="logo" aria-hidden="true"></div>
       <div>
         <h1>Pocket Reader</h1>
-        <div class="sub">DOCX + PDF + EPUB + OCR + Read Aloud</div>
+        <div class="sub">DOCX + PDF + OCR + Read Aloud</div>
       </div>
     </div>
   </div>
@@ -209,8 +209,6 @@
   <div class="chipbar">
     <div class="chip active" data-tab="load">Load</div>
     <div class="chip" data-tab="ocr">OCR</div>
-    <div class="chip" data-tab="gutenberg">Gutenberg</div>
-    <div class="chip" data-tab="epub">EPUB</div>
     <div class="chip" data-tab="tips">Tips</div>
   </div>
 
@@ -221,11 +219,11 @@
 
         <!-- LOAD -->
         <div class="tab" id="tab-load">
-          <div class="muted">Supports .txt, .md, .html, .epub, .docx, .pdf</div>
+          <div class="muted">Supports .txt, .md, .html, .docx, .pdf (text PDFs only)</div>
           <div style="height:10px;"></div>
 
           <input id="fileInput" type="file"
-            accept=".txt,.text,.md,.html,.htm,.epub,.docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document,application/epub+zip" />
+            accept=".txt,.text,.md,.html,.htm,.docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
           <div id="fileStatus" class="status"></div>
 
           <div style="height:14px;"></div>
@@ -241,14 +239,27 @@
         <!-- OCR -->
         <div class="tab" id="tab-ocr" style="display:none;">
           <div class="muted">
-            OCR is best for photos/screenshots and single pages. Whole scanned PDFs on iPhone will be slow.
+            For scanned PDFs: pick the PDF here, choose a page, render it, then OCR it.
           </div>
           <div style="height:10px;"></div>
 
+          <div class="muted">Option A: OCR an image (screenshot/photo)</div>
           <input id="imgInput" type="file" accept="image/*,.png,.jpg,.jpeg,.webp" />
           <div style="height:10px;"></div>
 
+          <div class="muted">Option B: OCR a scanned PDF page</div>
+          <input id="pdfOcrInput" type="file" accept=".pdf,application/pdf" />
+
+          <div style="height:10px;"></div>
           <div class="row">
+            <label class="muted" style="flex:1;">
+              PDF page
+              <input id="pdfPage" type="number" min="1" value="1" />
+            </label>
+            <button id="renderPdfPage" class="ghost smallBtn">Render</button>
+          </div>
+
+          <div class="row" style="margin-top:8px;">
             <select id="ocrLang">
               <option value="eng" selected>English</option>
               <option value="spa">Spanish</option>
@@ -259,6 +270,7 @@
           </div>
 
           <div style="height:10px;"></div>
+          <canvas id="pdfCanvas" style="display:none;"></canvas>
           <img id="ocrPreview" class="previewImg" alt="OCR preview" style="display:none;" />
 
           <div id="ocrStatus" class="status"></div>
@@ -267,63 +279,20 @@
             <button id="ocrToReader" class="ghost">Load OCR text into Reader</button>
             <button id="ocrSpeak" class="primary">Load + Speak</button>
           </div>
-        </div>
 
-        <!-- GUTENBERG -->
-        <div class="tab" id="tab-gutenberg" style="display:none;">
-          <div class="muted">Search Project Gutenberg (via Gutendex).</div>
-          <div style="height:10px;"></div>
-
-          <div class="row">
-            <input id="q" placeholder="Search title/author (e.g., Moby Dick, Austen)" />
-            <button id="searchBtn" class="primary">Search</button>
+          <div class="tiny" style="margin-top:10px;">
+            Tip: On iPhone, OCR works best if you “Render” the page first, then OCR.
+            Trying to OCR huge multi-page PDFs all at once is where Safari usually dies.
           </div>
-
-          <div style="height:10px;"></div>
-          <div class="row">
-            <select id="lang">
-              <option value="">Any language</option>
-              <option value="en" selected>English</option>
-              <option value="fr">French</option>
-              <option value="de">German</option>
-              <option value="es">Spanish</option>
-            </select>
-            <select id="maxResults">
-              <option>10</option>
-              <option selected>20</option>
-              <option>40</option>
-            </select>
-          </div>
-
-          <div id="searchStatus" class="status"></div>
-          <div id="results"></div>
-        </div>
-
-        <!-- EPUB -->
-        <div class="tab" id="tab-epub" style="display:none;">
-          <div class="muted">When an EPUB is loaded, chapters show here.</div>
-          <div style="height:10px;"></div>
-
-          <label class="muted" style="display:flex; gap:8px; align-items:center;">
-            <input id="autoPlayEpub" type="checkbox" style="width:auto;" />
-            Auto-play next chapter
-          </label>
-
-          <div class="row" style="margin-top:8px;">
-            <button id="prevChapter" class="ghost">◀ Prev</button>
-            <button id="nextChapter" class="ghost">Next ▶</button>
-          </div>
-
-          <div class="toc" id="toc"></div>
-          <div id="epubStatus" class="status"></div>
         </div>
 
         <!-- TIPS -->
         <div class="tab" id="tab-tips" style="display:none;">
           <div class="muted" style="line-height:1.6;">
-            <b>Scanned PDFs:</b> You need OCR. For best results, screenshot a page and OCR the image.<br/><br/>
-            <b>If updates don’t show:</b> you’re cached. Bump the service worker cache version and reopen with ?v=4.<br/><br/>
-            <b>Best voices:</b> Settings → Accessibility → Spoken Content → Voices → download a high quality US male voice.
+            <b>Why OCR didn’t “see” your scanned PDF:</b><br/>
+            OCR reads images. A scanned PDF is images inside a PDF container. So we must render a page first, then OCR.<br/><br/>
+            <b>Best results:</b><br/>
+            Use “Render” on the page, then “Run OCR”. If the page is skewed or blurry, OCR quality drops fast.
           </div>
         </div>
 
@@ -352,7 +321,7 @@
   </div>
 
   <!-- Floating player -->
-  <div class="playerFab" id="playerFab">
+  <div class="playerFab">
     <button class="fabMain" id="fabToggle" aria-label="Toggle player">
       <span id="fabIcon">▶</span>
       <span id="fabPct" class="fabPct">0%</span>
@@ -392,16 +361,12 @@
   </div>
 </div>
 
-<div id="epubHidden" style="position:absolute; left:-99999px; top:-99999px; width:900px; height:700px;"></div>
-
 <script>
   // Tabs
   const chips = [...document.querySelectorAll(".chip")];
   const tabs = {
     load: document.getElementById("tab-load"),
     ocr: document.getElementById("tab-ocr"),
-    gutenberg: document.getElementById("tab-gutenberg"),
-    epub: document.getElementById("tab-epub"),
     tips: document.getElementById("tab-tips"),
   };
   const leftTitle = document.getElementById("leftTitle");
@@ -411,6 +376,12 @@
     leftTitle.textContent = name.charAt(0).toUpperCase() + name.slice(1);
   }
   chips.forEach(c => c.addEventListener("click", () => setTab(c.dataset.tab)));
+
+  // PDF worker
+  if (window.pdfjsLib) {
+    pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
+  }
 
   // DOM
   const fileInput = document.getElementById("fileInput");
@@ -438,111 +409,53 @@
   const progressFill = document.getElementById("progressFill");
   const progressText = document.getElementById("progressText");
 
+  const fabToggle = document.getElementById("fabToggle");
+  const fabPanel = document.getElementById("fabPanel");
+  const fabIcon = document.getElementById("fabIcon");
+  const fabPct = document.getElementById("fabPct");
+
   // OCR DOM
   const imgInput = document.getElementById("imgInput");
+  const pdfOcrInput = document.getElementById("pdfOcrInput");
+  const pdfPage = document.getElementById("pdfPage");
+  const renderPdfPageBtn = document.getElementById("renderPdfPage");
+  const pdfCanvas = document.getElementById("pdfCanvas");
   const ocrLang = document.getElementById("ocrLang");
   const runOcr = document.getElementById("runOcr");
   const ocrPreview = document.getElementById("ocrPreview");
   const ocrStatus = document.getElementById("ocrStatus");
   const ocrToReader = document.getElementById("ocrToReader");
   const ocrSpeak = document.getElementById("ocrSpeak");
+
   let ocrText = "";
-  let ocrImageURL = "";
+  let imageURL = "";
+  let loadedPdfBytes = null;
+  let pdfNumPages = 0;
+  let renderedDataURL = ""; // what OCR will actually process
 
-  // Gutenberg DOM
-  const q = document.getElementById("q");
-  const searchBtn = document.getElementById("searchBtn");
-  const searchStatus = document.getElementById("searchStatus");
-  const results = document.getElementById("results");
-  const lang = document.getElementById("lang");
-  const maxResults = document.getElementById("maxResults");
-
-  // EPUB DOM
-  const tocEl = document.getElementById("toc");
-  const epubStatus = document.getElementById("epubStatus");
-  const autoPlayEpub = document.getElementById("autoPlayEpub");
-  const prevChapterBtn = document.getElementById("prevChapter");
-  const nextChapterBtn = document.getElementById("nextChapter");
-  const epubHidden = document.getElementById("epubHidden");
-
-  // Floating player
-  const fabToggle = document.getElementById("fabToggle");
-  const fabPanel = document.getElementById("fabPanel");
-  const fabIcon = document.getElementById("fabIcon");
-  const fabPct = document.getElementById("fabPct");
-
-  // PDF worker
-  if (window.pdfjsLib) {
-    pdfjsLib.GlobalWorkerOptions.workerSrc =
-      "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
-  }
-
-  // Storage
-  const STORAGE = {
-    lastMode: "pr_lastMode",
-    lastText: "pr_lastText",
-    lastLabel: "pr_lastLabel",
-    lastRate: "pr_rate",
-    lastPitch: "pr_pitch",
-    lastVoice: "pr_voice",
-    highlight: "pr_highlight",
-    setStartMode: "pr_setStartMode",
-    autoPlay: "pr_autoplay_epub",
-    lastEpubHref: "pr_lastEpubHref",
-    resumeIdx: "pr_resumeSentenceIdx"
-  };
-
-  // State
-  const state = {
-    mode: "text",
-    label: "Loaded",
-    textRaw: "",
-    sentences: [],
-    sentenceEls: [],
-    currentSentenceIndex: 0,
-    voices: [],
-    speaking: false,
-
-    epub: null,
-    epubTocFlat: [],
-    activeTocIndex: -1
-  };
-
-  // Helpers
   function setStatus(el, msg, kind="ok"){
     el.textContent = msg || "";
     el.className = "status " + (kind==="warn" ? "warn" : (kind==="danger" ? "dangerText" : ""));
   }
-  function setDocTitle(label, mode){
-    docLabel.textContent = label || "Reader";
-    modeLabel.textContent = "mode: " + (mode || "text");
-  }
-  function stripHtmlIfNeeded(text, filenameLower=""){
-    if (!text) return "";
-    const looksHtml =
-      filenameLower.endsWith(".html") ||
-      filenameLower.endsWith(".htm") ||
-      /<\/(p|div|h1|h2|h3|br|body|html)>/i.test(text);
-    if (!looksHtml) return text;
-    const tmp = document.createElement("div");
-    tmp.innerHTML = text;
-    tmp.querySelectorAll("script,style").forEach(el => el.remove());
-    const out = (tmp.textContent || tmp.innerText || "").trim();
-    return out.replace(/\n{3,}/g, "\n\n");
-  }
-  function htmlToText(html){
-    const tmp = document.createElement("div");
-    tmp.innerHTML = html || "";
-    tmp.querySelectorAll("script,style").forEach(el => el.remove());
-    const text = (tmp.textContent || tmp.innerText || "").trim();
-    return text.replace(/\n{3,}/g, "\n\n");
-  }
+
   function splitIntoSentences(text){
     const t = (text || "").replace(/\r\n/g, "\n").trim();
     if (!t) return [];
     const parts = t.split(/(?<=[.!?])\s+(?=[A-Z0-9“"'\(\[])/g);
     return parts.map(s => s.trim()).filter(Boolean);
   }
+
+  const state = {
+    textRaw: "",
+    sentences: [],
+    sentenceEls: [],
+    currentSentenceIndex: 0,
+    voices: [],
+    speaking: false,
+    label: "Loaded",
+    mode: "text"
+  };
+
   function renderReaderWithSentences(sentences){
     reader.innerHTML = "";
     state.sentenceEls = [];
@@ -558,6 +471,7 @@
     });
     reader.appendChild(frag);
   }
+
   function clearActiveHighlight(){
     for (const el of state.sentenceEls) if (el) el.classList.remove("active");
   }
@@ -569,6 +483,7 @@
     el.classList.add("active");
     try { el.scrollIntoView({ block:"center", behavior:"smooth" }); } catch(e){}
   }
+
   function updateProgress(){
     const total = state.sentences.length || 0;
     const idx = Math.max(0, Math.min(state.currentSentenceIndex, Math.max(0, total-1)));
@@ -578,7 +493,11 @@
     if (fabPct) fabPct.textContent = total ? `${pct}%` : "0%";
   }
 
-  // TTS
+  function setDocTitle(label, mode){
+    docLabel.textContent = label || "Reader";
+    modeLabel.textContent = "mode: " + (mode || "text");
+  }
+
   function stopSpeaking(){
     try { speechSynthesis.cancel(); } catch(e) {}
     state.speaking = false;
@@ -586,23 +505,24 @@
     clearActiveHighlight();
     if (fabIcon) fabIcon.textContent = "▶";
   }
+
   function getSelectedVoice(){
     const name = voiceSelect.value;
     return state.voices.find(v => v.name === name) || null;
   }
+
   function speakFrom(index){
     if (!state.textRaw.trim()) { setStatus(ttsStatus, "No text loaded.", "warn"); return; }
     stopSpeaking();
     state.speaking = true;
     state.currentSentenceIndex = Math.max(0, Math.min(index, state.sentences.length - 1));
-    localStorage.setItem(STORAGE.resumeIdx, String(state.currentSentenceIndex));
     updateProgress();
     if (fabIcon) fabIcon.textContent = "⏸";
     speakNextSentence();
   }
+
   function speakNextSentence(){
     if (!state.speaking) return;
-
     if (state.currentSentenceIndex >= state.sentences.length){
       state.speaking = false;
       setStatus(ttsStatus, "Finished.", "ok");
@@ -610,7 +530,6 @@
       if (fabIcon) fabIcon.textContent = "▶";
       return;
     }
-
     const s = state.sentences[state.currentSentenceIndex];
     const voice = getSelectedVoice();
 
@@ -631,7 +550,6 @@
     };
     u.onend = () => {
       state.currentSentenceIndex += 1;
-      localStorage.setItem(STORAGE.resumeIdx, String(state.currentSentenceIndex));
       speakNextSentence();
     };
 
@@ -655,10 +573,8 @@
       opt.textContent = `${v.name} — ${v.lang}${v.default ? " (default)" : ""}`;
       voiceSelect.appendChild(opt);
     }
-    const saved = localStorage.getItem(STORAGE.lastVoice);
-    const preferred = saved && sorted.some(v => v.name === saved)
-      ? saved
-      : (sorted.find(v => (v.lang || "").toLowerCase().includes("en-us"))?.name || sorted[0]?.name);
+    // Pick first en-US if available
+    const preferred = sorted.find(v => (v.lang || "").toLowerCase().includes("en-us"))?.name || sorted[0]?.name;
     if (preferred) voiceSelect.value = preferred;
   }
 
@@ -668,35 +584,54 @@
     state.label = label || "Loaded";
     state.textRaw = text || "";
     state.sentences = splitIntoSentences(state.textRaw);
-
-    let idx = parseInt(localStorage.getItem(STORAGE.resumeIdx) || "0", 10);
-    if (Number.isNaN(idx) || idx < 0 || idx >= state.sentences.length) idx = 0;
-    state.currentSentenceIndex = idx;
-
+    state.currentSentenceIndex = 0;
     renderReaderWithSentences(state.sentences);
     setDocTitle(state.label, state.mode);
-
-    localStorage.setItem(STORAGE.lastMode, state.mode);
-    localStorage.setItem(STORAGE.lastText, state.textRaw);
-    localStorage.setItem(STORAGE.lastLabel, state.label);
-
-    if (!state.textRaw.trim()){
-      setStatus(fileStatus, "No text loaded.", "warn");
-    } else {
-      setStatus(fileStatus, `${state.label} (${state.textRaw.length.toLocaleString()} chars)`, "ok");
-    }
-
-    setActiveHighlight(state.currentSentenceIndex);
+    setActiveHighlight(0);
     updateProgress();
+    setStatus(fileStatus, state.textRaw.trim() ? `${label} (${state.textRaw.length.toLocaleString()} chars)` : "No text loaded.", state.textRaw.trim() ? "ok" : "warn");
   }
 
-  // DOCX
+  // Floating player toggle + hide-on-scroll
+  let panelOpen = false;
+  fabToggle.addEventListener("click", () => {
+    panelOpen = !panelOpen;
+    fabPanel.classList.toggle("open", panelOpen);
+    fabPanel.setAttribute("aria-hidden", panelOpen ? "false" : "true");
+  });
+  let scrollTimer = null;
+  reader.addEventListener("scroll", () => {
+    document.body.classList.add("hideFab");
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => document.body.classList.remove("hideFab"), 420);
+  });
+
+  // Reader click jump
+  reader.addEventListener("click", (e) => {
+    const sent = e.target.closest(".sent");
+    if (!sent) return;
+    const idx = parseInt(sent.dataset.idx, 10);
+    if (Number.isNaN(idx)) return;
+    state.currentSentenceIndex = idx;
+    setActiveHighlight(idx);
+    updateProgress();
+    if (!setStartMode.checked) speakFrom(idx);
+    else setStatus(ttsStatus, "Start point set. Press Speak.", "ok");
+  });
+
+  // Controls
+  speakBtn.addEventListener("click", () => speakFrom(state.currentSentenceIndex || 0));
+  pauseBtn.addEventListener("click", () => { try { speechSynthesis.pause(); } catch(e){} if (fabIcon) fabIcon.textContent = "▶"; });
+  resumeBtn.addEventListener("click", () => { try { speechSynthesis.resume(); } catch(e){} if (fabIcon) fabIcon.textContent = "⏸"; });
+  stopBtn.addEventListener("click", stopSpeaking);
+
+  // DOCX -> text
   async function docxToText(arrayBuffer){
     const result = await mammoth.extractRawText({ arrayBuffer });
     return (result && result.value ? result.value : "").replace(/\n{3,}/g, "\n\n").trim();
   }
 
-  // PDF
+  // PDF -> text (for text PDFs)
   async function pdfToText(arrayBuffer){
     if (!window.pdfjsLib) throw new Error("PDF engine not loaded");
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -711,88 +646,7 @@
     return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
   }
 
-  // EPUB (kept minimal here)
-  function flattenToc(toc, out=[]){
-    for (const item of (toc || [])){
-      out.push({ label: item.label || "(untitled)", href: item.href });
-      if (item.subitems && item.subitems.length) flattenToc(item.subitems, out);
-    }
-    return out;
-  }
-  function updateTocActive(){
-    [...tocEl.querySelectorAll("button")].forEach(b => {
-      const idx = parseInt(b.dataset.idx, 10);
-      b.classList.toggle("active", idx === state.activeTocIndex);
-    });
-  }
-  async function loadEpubChapterByIndex(idx){
-    if (!state.epub || !state.epubTocFlat.length) return;
-    if (idx < 0 || idx >= state.epubTocFlat.length) return;
-    state.activeTocIndex = idx;
-    updateTocActive();
-    const item = state.epubTocFlat[idx];
-    setStatus(epubStatus, `Loading: ${item.label}…`, "ok");
-    const section = await state.epub.section(item.href);
-    const contents = await section.load(state.epub.load.bind(state.epub));
-    const html = contents?.document ? contents.document.documentElement.outerHTML : "";
-    const text = htmlToText(html);
-    localStorage.setItem(STORAGE.resumeIdx, "0");
-    loadText(text, `EPUB: ${item.label}`, "epub");
-    setStatus(epubStatus, `Loaded: ${item.label}`, "ok");
-  }
-  async function loadEpubFromArrayBuffer(buf, label){
-    setStatus(epubStatus, "Loading EPUB…", "ok");
-    tocEl.innerHTML = "";
-    state.epubTocFlat = [];
-    state.activeTocIndex = -1;
-    state.epub = ePub(buf);
-    state.epub.renderTo(epubHidden, { width:900, height:700 });
-    const nav = await state.epub.loaded.navigation;
-    state.epubTocFlat = flattenToc(nav?.toc || [], []);
-    tocEl.innerHTML = "";
-    state.epubTocFlat.forEach((it, idx) => {
-      const b = document.createElement("button");
-      b.textContent = it.label || "(untitled)";
-      b.dataset.idx = String(idx);
-      b.addEventListener("click", () => loadEpubChapterByIndex(idx));
-      tocEl.appendChild(b);
-    });
-    setStatus(fileStatus, label, "ok");
-    setTab("epub");
-    if (state.epubTocFlat.length) await loadEpubChapterByIndex(0);
-  }
-  prevChapterBtn.addEventListener("click", () => loadEpubChapterByIndex(Math.max(0, state.activeTocIndex - 1)));
-  nextChapterBtn.addEventListener("click", () => loadEpubChapterByIndex(Math.min(state.epubTocFlat.length - 1, state.activeTocIndex + 1)));
-
-  // Reader interactions
-  reader.addEventListener("click", (e) => {
-    const sent = e.target.closest(".sent");
-    if (!sent) return;
-    const idx = parseInt(sent.dataset.idx, 10);
-    if (Number.isNaN(idx)) return;
-    state.currentSentenceIndex = idx;
-    localStorage.setItem(STORAGE.resumeIdx, String(idx));
-    setActiveHighlight(idx);
-    updateProgress();
-    if (!setStartMode.checked) speakFrom(idx);
-    else setStatus(ttsStatus, "Start point set. Press Speak.", "ok");
-  });
-
-  // Floating toggle + hide-on-scroll
-  let panelOpen = false;
-  fabToggle.addEventListener("click", () => {
-    panelOpen = !panelOpen;
-    fabPanel.classList.toggle("open", panelOpen);
-    fabPanel.setAttribute("aria-hidden", panelOpen ? "false" : "true");
-  });
-  let scrollTimer = null;
-  reader.addEventListener("scroll", () => {
-    document.body.classList.add("hideFab");
-    if (scrollTimer) clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(() => document.body.classList.remove("hideFab"), 420);
-  });
-
-  // File loading
+  // Load tab file input
   fileInput.addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
@@ -800,80 +654,125 @@
     setStatus(fileStatus, `Loading: ${f.name}…`, "ok");
 
     try{
-      if (name.endsWith(".epub") || f.type === "application/epub+zip"){
-        localStorage.setItem(STORAGE.resumeIdx, "0");
-        await loadEpubFromArrayBuffer(await f.arrayBuffer(), `Loaded EPUB: ${f.name}`);
-        return;
-      }
-
-      if (name.endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"){
+      if (name.endsWith(".docx")){
         const text = await docxToText(await f.arrayBuffer());
-        localStorage.setItem(STORAGE.resumeIdx, "0");
         loadText(text, `Loaded DOCX: ${f.name}`, "text");
         return;
       }
-
       if (name.endsWith(".pdf") || f.type === "application/pdf"){
         const text = await pdfToText(await f.arrayBuffer());
-        if (!text || text.length < 10) {
-          setStatus(fileStatus, "This PDF looks scanned (image-only). Use the OCR tab with a screenshot/page image.", "warn");
+        if (!text || text.length < 10){
+          setStatus(fileStatus, "This PDF looks scanned (image-only). Use OCR tab: upload the PDF, Render a page, then Run OCR.", "warn");
           loadText("", "PDF (no extractable text)", "text");
         } else {
-          localStorage.setItem(STORAGE.resumeIdx, "0");
           loadText(text, `Loaded PDF: ${f.name}`, "text");
         }
         return;
       }
-
       const raw = await f.text();
-      const cleaned = stripHtmlIfNeeded(raw, name);
-      localStorage.setItem(STORAGE.resumeIdx, "0");
-      loadText(cleaned, `Loaded file: ${f.name}`, "text");
+      loadText(raw, `Loaded file: ${f.name}`, "text");
     } catch(err){
       console.error(err);
-      setStatus(fileStatus, "Could not read that file.", "warn");
+      setStatus(fileStatus, "Could not read that file. If it’s scanned, use the OCR tab.", "warn");
     } finally {
       fileInput.value = "";
     }
   });
 
-  usePaste.addEventListener("click", () => {
-    localStorage.setItem(STORAGE.resumeIdx, "0");
-    loadText(pasteBox.value || "", "Loaded pasted text", "text");
-  });
-  clearText.addEventListener("click", () => {
-    pasteBox.value = "";
-    localStorage.setItem(STORAGE.resumeIdx, "0");
-    loadText("", "Cleared", "text");
-  });
+  usePaste.addEventListener("click", () => loadText(pasteBox.value || "", "Loaded pasted text", "text"));
+  clearText.addEventListener("click", () => { pasteBox.value = ""; loadText("", "Cleared", "text"); });
 
-  // OCR
+  // OCR: image upload
   imgInput.addEventListener("change", async (e) => {
     const f = e.target.files && e.target.files[0];
     if (!f) return;
-    if (ocrImageURL) URL.revokeObjectURL(ocrImageURL);
-    ocrImageURL = URL.createObjectURL(f);
-    ocrPreview.src = ocrImageURL;
+    if (imageURL) URL.revokeObjectURL(imageURL);
+    imageURL = URL.createObjectURL(f);
+    renderedDataURL = ""; // if you upload an image, OCR should use the image URL
+    ocrPreview.src = imageURL;
     ocrPreview.style.display = "block";
+    pdfCanvas.style.display = "none";
     ocrText = "";
     setStatus(ocrStatus, "Image loaded. Tap Run OCR.", "ok");
   });
 
+  // OCR: PDF upload (scanned PDF)
+  pdfOcrInput.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+
+    loadedPdfBytes = await f.arrayBuffer();
+    setStatus(ocrStatus, "PDF loaded. Tap Render to preview a page, then Run OCR.", "ok");
+
+    // Get page count
+    try{
+      const pdf = await pdfjsLib.getDocument({ data: loadedPdfBytes }).promise;
+      pdfNumPages = pdf.numPages;
+      if (pdfPage) {
+        pdfPage.max = String(pdfNumPages);
+        if (parseInt(pdfPage.value,10) > pdfNumPages) pdfPage.value = "1";
+      }
+      setStatus(ocrStatus, `PDF loaded (${pdfNumPages} pages). Set page number and tap Render.`, "ok");
+    } catch(err){
+      console.error(err);
+      setStatus(ocrStatus, "Could not open that PDF.", "warn");
+      loadedPdfBytes = null;
+      pdfNumPages = 0;
+    }
+  });
+
+  // Render selected PDF page to canvas, then to image preview
+  renderPdfPageBtn.addEventListener("click", async () => {
+    if (!loadedPdfBytes){
+      setStatus(ocrStatus, "Upload a PDF first.", "warn");
+      return;
+    }
+    const pageNum = Math.max(1, parseInt(pdfPage.value || "1", 10));
+    setStatus(ocrStatus, `Rendering page ${pageNum}…`, "ok");
+
+    try{
+      const pdf = await pdfjsLib.getDocument({ data: loadedPdfBytes }).promise;
+      const p = Math.min(pageNum, pdf.numPages);
+      const page = await pdf.getPage(p);
+
+      // Mobile-friendly render scale
+      const viewport = page.getViewport({ scale: 2.0 });
+      const ctx = pdfCanvas.getContext("2d", { willReadFrequently: true });
+      pdfCanvas.width = Math.floor(viewport.width);
+      pdfCanvas.height = Math.floor(viewport.height);
+
+      await page.render({ canvasContext: ctx, viewport }).promise;
+
+      // Turn canvas into a data URL for OCR
+      renderedDataURL = pdfCanvas.toDataURL("image/png");
+      ocrPreview.src = renderedDataURL;
+      ocrPreview.style.display = "block";
+      pdfCanvas.style.display = "none";
+
+      setStatus(ocrStatus, `Rendered page ${p}. Now tap Run OCR.`, "ok");
+    } catch(err){
+      console.error(err);
+      setStatus(ocrStatus, "Render failed. Try a different page or a smaller PDF.", "warn");
+    }
+  });
+
+  // Run OCR on either uploaded image or rendered PDF page
   runOcr.addEventListener("click", async () => {
-    if (!ocrImageURL){
-      setStatus(ocrStatus, "Upload an image first.", "warn");
+    const source = renderedDataURL || imageURL;
+    if (!source){
+      setStatus(ocrStatus, "Upload an image OR upload a PDF and render a page first.", "warn");
       return;
     }
     if (!window.Tesseract){
-      setStatus(ocrStatus, "OCR engine not loaded (cached build or blocked). Refresh with ?v=4 and try again.", "warn");
+      setStatus(ocrStatus, "OCR engine not loaded. This is usually a cache issue. Refresh with ?v=6.", "warn");
       return;
     }
 
-    setStatus(ocrStatus, "OCR running… (this can take 15–60 seconds on iPhone)", "ok");
+    setStatus(ocrStatus, "OCR running… (on iPhone, give it a moment)", "ok");
 
     try{
       const langCode = ocrLang.value;
-      const { data } = await Tesseract.recognize(ocrImageURL, langCode, {
+      const { data } = await Tesseract.recognize(source, langCode, {
         logger: m => {
           if (m.status && typeof m.progress === "number") {
             const pct = Math.round(m.progress * 100);
@@ -883,135 +782,32 @@
       });
 
       ocrText = (data && data.text ? data.text : "").trim();
-      if (!ocrText) {
-        setStatus(ocrStatus, "OCR finished but found little or no text. Try a sharper/closer photo.", "warn");
-      } else {
-        setStatus(ocrStatus, `OCR complete. ${ocrText.length.toLocaleString()} characters found.`, "ok");
-      }
+      if (!ocrText) setStatus(ocrStatus, "OCR finished but found little/no text. Try a clearer page.", "warn");
+      else setStatus(ocrStatus, `OCR complete. ${ocrText.length.toLocaleString()} characters found.`, "ok");
     } catch (err){
       console.error(err);
-      setStatus(ocrStatus, "OCR failed. Try a smaller image or screenshot a single page.", "warn");
+      setStatus(ocrStatus, "OCR failed. Try rendering at a lower scale or use a screenshot.", "warn");
     }
   });
 
   ocrToReader.addEventListener("click", () => {
     if (!ocrText) { setStatus(ocrStatus, "Run OCR first.", "warn"); return; }
-    localStorage.setItem(STORAGE.resumeIdx, "0");
     loadText(ocrText, "OCR text", "text");
   });
 
   ocrSpeak.addEventListener("click", () => {
     if (!ocrText) { setStatus(ocrStatus, "Run OCR first.", "warn"); return; }
-    localStorage.setItem(STORAGE.resumeIdx, "0");
     loadText(ocrText, "OCR text", "text");
     speakFrom(0);
   });
 
-  // Controls
-  speakBtn.addEventListener("click", () => speakFrom(state.currentSentenceIndex || 0));
-  pauseBtn.addEventListener("click", () => { try { speechSynthesis.pause(); } catch(e){} if (fabIcon) fabIcon.textContent = "▶"; });
-  resumeBtn.addEventListener("click", () => { try { speechSynthesis.resume(); } catch(e){} if (fabIcon) fabIcon.textContent = "⏸"; });
-  stopBtn.addEventListener("click", stopSpeaking);
-
-  voiceSelect.addEventListener("change", () => localStorage.setItem(STORAGE.lastVoice, voiceSelect.value));
-  rate.addEventListener("change", () => localStorage.setItem(STORAGE.lastRate, String(rate.value)));
-  pitch.addEventListener("change", () => localStorage.setItem(STORAGE.lastPitch, String(pitch.value)));
-  highlightToggle.addEventListener("change", () => {
-    localStorage.setItem(STORAGE.highlight, highlightToggle.checked ? "1" : "0");
-    if (!highlightToggle.checked) clearActiveHighlight();
-    else setActiveHighlight(state.currentSentenceIndex);
-  });
-  setStartMode.addEventListener("change", () => localStorage.setItem(STORAGE.setStartMode, setStartMode.checked ? "1" : "0"));
-
-  // Gutenberg (minimal)
-  async function gutendexSearch(query, language, limit){
-    const params = new URLSearchParams();
-    params.set("search", query);
-    if (language) params.set("languages", language);
-    params.set("page", "1");
-    const url = `https://gutendex.com/books?${params.toString()}`;
-    const res = await fetch(url);
-    if (!res.ok) throw new Error("Search failed");
-    const data = await res.json();
-    return (data.results || []).slice(0, limit);
-  }
-  function pickBestTextUrl(formats){
-    const keys = Object.keys(formats || {});
-    const prefer = ["text/plain; charset=utf-8","text/plain; charset=us-ascii","text/plain"];
-    for (const p of prefer){
-      const hit = keys.find(k => k.toLowerCase().startsWith(p));
-      if (hit) return formats[hit];
-    }
-    return null;
-  }
-  function pickEpubUrl(formats){
-    const keys = Object.keys(formats || {});
-    const hit = keys.find(k => k.toLowerCase().includes("application/epub+zip"));
-    return hit ? formats[hit] : null;
-  }
-  async function doSearch(){
-    const query = (q.value || "").trim();
-    if (!query){ setStatus(searchStatus, "Type a search query.", "warn"); return; }
-    results.innerHTML = "";
-    setStatus(searchStatus, "Searching…", "ok");
-
-    const items = await gutendexSearch(query, lang.value, parseInt(maxResults.value,10));
-    if (!items.length){
-      results.innerHTML = `<div class="muted">No results.</div>`;
-      return;
-    }
-
-    items.forEach(b => {
-      const title = b.title || "Untitled";
-      const authors = (b.authors || []).map(a => a.name).join(", ") || "Unknown author";
-      const textUrl = pickBestTextUrl(b.formats);
-      const epubUrl = pickEpubUrl(b.formats);
-
-      const div = document.createElement("div");
-      div.className = "result";
-      div.innerHTML = `
-        <div class="title">${title}</div>
-        <div class="meta">${authors}</div>
-        <div class="pills">
-          ${textUrl ? `<a class="pill" href="${textUrl}" target="_blank" rel="noopener">Download text</a>` : ""}
-          ${epubUrl ? `<a class="pill" href="${epubUrl}" target="_blank" rel="noopener">Download EPUB</a>` : ""}
-        </div>
-      `;
-      results.appendChild(div);
-    });
-
-    setStatus(searchStatus, `Found ${items.length} result(s).`, "ok");
-  }
-  searchBtn.addEventListener("click", () => { setTab("gutenberg"); doSearch(); });
-
-  // Restore & init voices
-  function restore(){
-    const savedRate = localStorage.getItem(STORAGE.lastRate);
-    const savedPitch = localStorage.getItem(STORAGE.lastPitch);
-    const savedVoice = localStorage.getItem(STORAGE.lastVoice);
-    const savedHighlight = localStorage.getItem(STORAGE.highlight);
-    const savedSetStart = localStorage.getItem(STORAGE.setStartMode);
-    if (savedRate) rate.value = savedRate;
-    if (savedPitch) pitch.value = savedPitch;
-    if (savedHighlight) highlightToggle.checked = savedHighlight === "1";
-    if (savedSetStart) setStartMode.checked = savedSetStart === "1";
-    populateVoices();
-    if (savedVoice) voiceSelect.value = savedVoice;
-
-    const lastText = localStorage.getItem(STORAGE.lastText) || "";
-    const lastLabel = localStorage.getItem(STORAGE.lastLabel) || "Restored";
-    const lastMode = localStorage.getItem(STORAGE.lastMode) || "text";
-    if (lastText) loadText(lastText, lastLabel, lastMode);
-    else { setDocTitle("Reader", "text"); updateProgress(); }
-  }
-
+  // Voices init
   if (typeof speechSynthesis !== "undefined"){
     populateVoices();
     speechSynthesis.onvoiceschanged = populateVoices;
   } else {
     setStatus(ttsStatus, "SpeechSynthesis not supported in this browser.", "warn");
   }
-  restore();
 
   // Service worker registration
   if ("serviceWorker" in navigator) {
