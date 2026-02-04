@@ -1,4 +1,4 @@
-const CACHE_NAME = "pocket-reader-v3"; // bump this when you update files
+const CACHE_NAME = "pocket-reader-v4"; // bump this when you update files
 const ASSETS = [
   "./",
   "./index.html",
