@@ -1,4 +1,4 @@
-const CACHE_NAME = "pocket-reader-v4"; // bump this when you update files
+const CACHE_NAME = "pocket-reader-v6";
 const ASSETS = [
   "./",
   "./index.html",
@@ -22,7 +22,6 @@ self.addEventListener("activate", (event) => {
   self.clients.claim();
 });
 
-// Cache-first for same-origin app shell; network-first for everything else
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
 
@@ -39,13 +38,5 @@ self.addEventListener("fetch", (event) => {
     return;
   }
 
-  event.respondWith(
-    fetch(event.request)
-      .then((resp) => {
-        const copy = resp.clone();
-        caches.open(CACHE_NAME).then(cache => cache.put(event.request, copy)).catch(() => {});
-        return resp;
-      })
-      .catch(() => caches.match(event.request))
-  );
+  event.respondWith(fetch(event.request).catch(() => caches.match(event.request)));
 });
