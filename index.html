@@ -463,6 +463,8 @@ gbResults.addEventListener("click", async (e) => {
 /* =========================
    TTS
    ========================= */
+
+
 const voiceSelect = document.getElementById("voiceSelect");
 const rate = document.getElementById("rate");
 const pitch = document.getElementById("pitch");
@@ -477,57 +479,170 @@ fabToggle.addEventListener("click", () => {
   fabPanel.classList.toggle("open", panelOpen);
 });
 
+function chooseBestVoice(voices){
+  // Prefer US English, then "Siri" / "Enhanced" style names when present.
+  const enUS = voices.filter(v => (v.lang || "").toLowerCase() === "en-us");
+  const pool = enUS.length ? enUS : voices;
+
+  const rank = (v) => {
+    const name = (v.name || "").toLowerCase();
+    let score = 0;
+    if ((v.lang || "").toLowerCase() === "en-us") score += 100;
+    if (name.includes("siri")) score += 30;
+    if (name.includes("enhanced")) score += 25;
+    if (name.includes("premium")) score += 20;
+    if (name.includes("male")) score += 8; // not reliable, but harmless
+    return score;
+  };
+
+  return pool.slice().sort((a,b) => rank(b) - rank(a))[0] || null;
+}
+
 function populateVoices(){
   const vs = speechSynthesis.getVoices();
   if (!vs || !vs.length) return;
+
   state.voices = vs;
   voiceSelect.innerHTML = "";
+
   const sorted = [...vs].sort((a,b) => {
-    const aUS = (a.lang || "").toLowerCase().includes("en-us");
-    const bUS = (b.lang || "").toLowerCase().includes("en-us");
+    const aUS = (a.lang || "").toLowerCase() === "en-us";
+    const bUS = (b.lang || "").toLowerCase() === "en-us";
     if (aUS !== bUS) return bUS - aUS;
     return (a.name || "").localeCompare(b.name || "");
   });
+
   sorted.forEach(v => {
     const opt = document.createElement("option");
     opt.value = v.name;
     opt.textContent = `${v.name} — ${v.lang}`;
     voiceSelect.appendChild(opt);
   });
-  const preferred = sorted.find(v => (v.lang||"").toLowerCase().includes("en-us"))?.name || sorted[0]?.name;
-  if (preferred) voiceSelect.value = preferred;
-  fabVoice.textContent = "Voice ready";
+
+  const best = chooseBestVoice(sorted);
+  if (best) voiceSelect.value = best.name;
+
+  fabVoice.textContent = best ? `Voice: ${best.lang}` : "Voice ready";
 }
 
 function stopSpeak(){ try{ speechSynthesis.cancel(); } catch(e){} fabIcon.textContent="▶"; }
+
+const pauseMs = document.getElementById("pauseMs");
+const pauseMsLabel = document.getElementById("pauseMsLabel");
+
+function updatePauseLabel(){
+  if (pauseMsLabel) pauseMsLabel.textContent = `${pauseMs.value} ms`;
+}
+if (pauseMs) pauseMs.addEventListener("input", updatePauseLabel);
+updatePauseLabel();
+
+let speakQueue = [];
+let speaking = false;
+let stopped = false;
+
+function splitSentences(text){
+  const t = (text || "").replace(/\r\n/g, "\n").trim();
+  if (!t) return [];
+  // Sentence-ish split. Good enough for natural pacing.
+  const parts = t.split(/(?<=[.!?])\s+(?=[A-Z0-9“"'\(\[])/g);
+  return parts.map(s => s.trim()).filter(Boolean);
+}
+
+function chunkLongSentence(sentence, maxLen = 220){
+  if (sentence.length <= maxLen) return [sentence];
+  const chunks = [];
+  let s = sentence;
+  while (s.length > maxLen){
+    // Try to split at a comma or space near the limit.
+    let cut = s.lastIndexOf(",", maxLen);
+    if (cut < 80) cut = s.lastIndexOf(" ", maxLen);
+    if (cut < 80) cut = maxLen;
+    chunks.push(s.slice(0, cut + 1).trim());
+    s = s.slice(cut + 1).trim();
+  }
+  if (s) chunks.push(s);
+  return chunks;
+}
+
+function stopSpeak(){
+  stopped = true;
+  speaking = false;
+  speakQueue = [];
+  try { speechSynthesis.cancel(); } catch(e){}
+  fabIcon.textContent = "▶";
+}
 
 function speakAll(){
   if (!state.textRaw.trim()){
     setStatus(ttsStatus, "No text loaded.", "warn");
     return;
   }
-  stopSpeak();
-  fabIcon.textContent="⏸";
-  const v = state.voices.find(x => x.name === voiceSelect.value) || null;
-  const u = new SpeechSynthesisUtterance(state.textRaw);
-  if (v) u.voice = v;
-  u.rate = parseFloat(rate.value);
-  u.pitch = parseFloat(pitch.value);
-  u.onend = () => { fabIcon.textContent="▶"; };
-  u.onerror = () => { setStatus(ttsStatus, "Speech error. Try another voice.", "warn"); fabIcon.textContent="▶"; };
-  speechSynthesis.speak(u);
+
+  stopSpeak(); // clears any prior state
+  stopped = false;
+  fabIcon.textContent = "⏸";
+
+  const v = state.voices.find(x => x.name === voiceSelect.value) || chooseBestVoice(state.voices);
+
+  // Build queue: sentences, then chunk long ones
+  const sentences = splitSentences(state.textRaw);
+  const q = [];
+  for (const sent of sentences){
+    const chunks = chunkLongSentence(sent, 220);
+    for (const c of chunks) q.push(c);
+    // Add a special pause marker after each sentence
+    q.push({ __pause: true, ms: parseInt(pauseMs?.value || "250", 10) });
+    // Extra pause if sentence ends a paragraph (simple heuristic)
+    if (/\n\s*\n/.test(sent)) q.push({ __pause: true, ms: 350 });
+  }
+  speakQueue = q;
+  speaking = true;
+
+  const speakNext = () => {
+    if (stopped || !speaking) return;
+    if (!speakQueue.length){
+      speaking = false;
+      fabIcon.textContent = "▶";
+      return;
+    }
+
+    const item = speakQueue.shift();
+
+    if (item && item.__pause){
+      setTimeout(speakNext, item.ms || 250);
+      return;
+    }
+
+    const u = new SpeechSynthesisUtterance(String(item));
+    if (v) u.voice = v;
+    u.rate = parseFloat(rate.value);
+    u.pitch = parseFloat(pitch.value);
+
+    u.onend = () => {
+      // Small breath between chunks even within a sentence
+      setTimeout(speakNext, 40);
+    };
+    u.onerror = () => {
+      setStatus(ttsStatus, "Speech error. Try another voice.", "warn");
+      speaking = false;
+      fabIcon.textContent = "▶";
+    };
+
+    try {
+      speechSynthesis.speak(u);
+    } catch (e) {
+      setStatus(ttsStatus, `Speech failed: ${e?.message || String(e)}`, "danger");
+      speaking = false;
+      fabIcon.textContent = "▶";
+    }
+  };
+
+  speakNext();
 }
 
-document.getElementById("speak").addEventListener("click", speakAll);
-document.getElementById("pause").addEventListener("click", () => { try{ speechSynthesis.pause(); } catch(e){} fabIcon.textContent="▶"; });
-document.getElementById("resume").addEventListener("click", () => { try{ speechSynthesis.resume(); } catch(e){} fabIcon.textContent="⏸"; });
+// Keep your existing pause/resume buttons, but make stop use the new stop
 document.getElementById("stop").addEventListener("click", stopSpeak);
-
-if (typeof speechSynthesis !== "undefined"){
-  populateVoices();
-  speechSynthesis.onvoiceschanged = populateVoices;
-}
-
+document.getElementById("speak").addEventListener("click", speakAll);
 /* =========================
    Load libraries with fallback CDNs
    ========================= */
