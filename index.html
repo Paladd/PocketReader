@@ -298,10 +298,40 @@ function setStatus(el, msg, kind="ok"){
 const state = { textRaw:"", voices:[] };
 
 function loadText(text, label){
-  state.textRaw = (text || "").trim();
+  const textToSpeak = sentenceList.slice(startIndex).join(" ");
   docLabel.textContent = label || "Reader";
   modeLabel.textContent = "mode: text";
-  reader.textContent = state.textRaw || "No text loaded.";
+  renderSentences(state.textRaw);
+}
+
+function splitIntoSentences(text){
+  const t = (text || "").replace(/\r\n/g, "\n").trim();
+  if (!t) return [];
+  // decent sentence split
+  return t.split(/(?<=[.!?])\s+(?=[A-Z0-9“"'\(\[])/g).map(s => s.trim()).filter(Boolean);
+}
+
+function renderSentences(text){
+  sentenceList = splitIntoSentences(text);
+  startIndex = 0;
+
+  reader.innerHTML = "";
+  sentenceList.forEach((s, i) => {
+    const span = document.createElement("span");
+    span.className = "sent";
+    span.dataset.i = String(i);
+    span.textContent = s + " ";
+    span.addEventListener("click", () => {
+      startIndex = i;
+      // highlight
+      [...reader.querySelectorAll(".sent")].forEach(el => el.classList.remove("active"));
+      span.classList.add("active");
+      setStatus(ttsStatus, `Start set at sentence ${i+1}.`, "ok");
+    });
+    reader.appendChild(span);
+  });
+
+  if (!sentenceList.length) reader.textContent = "No text loaded.";
 }
 
 /* =========================
