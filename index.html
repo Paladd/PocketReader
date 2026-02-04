@@ -54,7 +54,7 @@
       color:var(--text);
       padding:8px 12px;
       border-radius:999px;
-      font-weight:750;
+      font-weight:800;
       cursor:pointer;
       user-select:none;
       font-size:13px;
@@ -80,7 +80,7 @@
       padding:12px;
       display:flex; align-items:center; justify-content:space-between; gap:10px;
       border-bottom:1px solid var(--stroke);
-      font-weight:800;
+      font-weight:900;
     }
     .card .bd{ padding:12px; }
 
@@ -96,7 +96,7 @@
       font-size:14px;
     }
     textarea{ min-height:90px; resize:vertical; }
-    button{ cursor:pointer; font-weight:800; }
+    button{ cursor:pointer; font-weight:900; }
     .primary{ background:var(--brand); border-color:var(--brand); }
     .ghost{ background:transparent; }
     .danger{ background:var(--danger); border-color:var(--danger); }
@@ -104,11 +104,10 @@
     .row{ display:flex; gap:8px; flex-wrap:wrap; }
     .row > *{ flex:1; }
     .muted{ color:var(--muted); font-size:12px; }
-    .status{ margin-top:8px; font-size:12px; color:#9fe6b8; }
+    .status{ margin-top:8px; font-size:12px; color:#9fe6b8; white-space:pre-wrap; }
     .warn{ color:#ffd27d; }
     .dangerText{ color:#ff9f9f; }
 
-    /* Reader */
     #reader{
       white-space:pre-wrap;
       line-height:1.7;
@@ -134,54 +133,6 @@
       overflow:hidden;
     }
     .progressFill{ height:100%; width:0%; background:var(--brand); }
-
-    /* Scrubber overlay */
-    #scrubOverlay{
-      position:fixed; inset:0; display:none; z-index:9999;
-      background: rgba(0,0,0,.55);
-      align-items:center; justify-content:center; padding:16px;
-    }
-    #scrubCard{
-      width:min(520px, 92vw);
-      background:var(--card);
-      border:1px solid var(--stroke);
-      border-radius:16px;
-      padding:14px;
-    }
-    #scrubPreview{
-      margin-top:10px;
-      padding:10px;
-      border:1px solid var(--stroke);
-      border-radius:14px;
-      background:var(--panel);
-      font-size:13px;
-      color:var(--muted);
-      max-height:140px;
-      overflow:auto;
-      white-space:pre-wrap;
-    }
-
-    /* EPUB */
-    #epubHidden{ position:absolute; left:-99999px; top:-99999px; width:900px; height:700px; }
-    .toc{ margin-top:10px; border:1px solid var(--stroke); border-radius:16px; background:var(--panel); max-height:240px; overflow:auto; padding:8px; }
-    .toc button{
-      width:100%; text-align:left; background:transparent; border:1px solid transparent;
-      padding:8px 10px; border-radius:12px; margin:2px 0; font-weight:800;
-    }
-    .toc button:hover{ border-color:var(--stroke2); }
-    .toc button.active{ border-color:var(--brand); }
-
-    /* Gutenberg */
-    #results{ display:flex; flex-direction:column; gap:10px; margin-top:10px; }
-    .result{ padding:10px; border:1px solid var(--stroke); border-radius:16px; background:var(--panel); }
-    .result .title{ font-weight:900; margin-bottom:4px; }
-    .result .meta{ font-size:12px; color:var(--muted); margin-bottom:8px; }
-    .pills{ display:flex; gap:8px; flex-wrap:wrap; }
-    .pill, a.pill{
-      display:inline-block; border:1px solid var(--stroke2); background:rgba(18,20,27,.65);
-      padding:6px 10px; border-radius:999px; font-size:12px; cursor:pointer; user-select:none;
-      color:var(--text); text-decoration:none;
-    }
 
     /* Floating player */
     .playerFab{
@@ -221,16 +172,26 @@
     .fabPanel.open{ display: block; }
     .hideFab .fabMain{ opacity: 0.15; }
     .hideFab .fabMain:hover{ opacity: 1; }
+
+    /* OCR preview */
+    .previewImg{
+      width:100%;
+      border-radius:16px;
+      border:1px solid var(--stroke);
+      background:var(--panel);
+      max-height:220px;
+      object-fit:contain;
+    }
   </style>
 
   <!-- EPUB.js -->
   <script src="https://unpkg.com/epubjs/dist/epub.min.js"></script>
-
   <!-- DOCX -> text (Mammoth) -->
   <script src="https://unpkg.com/mammoth/mammoth.browser.min.js"></script>
-
   <!-- PDF.js -->
   <script src="https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.min.js"></script>
+  <!-- OCR (Tesseract.js) -->
+  <script src="https://unpkg.com/tesseract.js@5.1.0/dist/tesseract.min.js"></script>
 </head>
 
 <body>
@@ -240,14 +201,14 @@
       <div class="logo" aria-hidden="true"></div>
       <div>
         <h1>Pocket Reader</h1>
-        <div class="sub">DOCX + PDF + EPUB + Gutenberg + Read Aloud</div>
+        <div class="sub">DOCX + PDF + EPUB + OCR + Read Aloud</div>
       </div>
     </div>
-    <button id="installBtn" class="ghost" style="width:auto; display:none;">Install</button>
   </div>
 
   <div class="chipbar">
     <div class="chip active" data-tab="load">Load</div>
+    <div class="chip" data-tab="ocr">OCR</div>
     <div class="chip" data-tab="gutenberg">Gutenberg</div>
     <div class="chip" data-tab="epub">EPUB</div>
     <div class="chip" data-tab="tips">Tips</div>
@@ -258,6 +219,7 @@
       <div class="hd"><span id="leftTitle">Load</span></div>
       <div class="bd">
 
+        <!-- LOAD -->
         <div class="tab" id="tab-load">
           <div class="muted">Supports .txt, .md, .html, .epub, .docx, .pdf</div>
           <div style="height:10px;"></div>
@@ -276,6 +238,38 @@
           </div>
         </div>
 
+        <!-- OCR -->
+        <div class="tab" id="tab-ocr" style="display:none;">
+          <div class="muted">
+            OCR is best for photos/screenshots and single pages. Whole scanned PDFs on iPhone will be slow.
+          </div>
+          <div style="height:10px;"></div>
+
+          <input id="imgInput" type="file" accept="image/*,.png,.jpg,.jpeg,.webp" />
+          <div style="height:10px;"></div>
+
+          <div class="row">
+            <select id="ocrLang">
+              <option value="eng" selected>English</option>
+              <option value="spa">Spanish</option>
+              <option value="fra">French</option>
+              <option value="deu">German</option>
+            </select>
+            <button id="runOcr" class="primary">Run OCR</button>
+          </div>
+
+          <div style="height:10px;"></div>
+          <img id="ocrPreview" class="previewImg" alt="OCR preview" style="display:none;" />
+
+          <div id="ocrStatus" class="status"></div>
+
+          <div class="row" style="margin-top:8px;">
+            <button id="ocrToReader" class="ghost">Load OCR text into Reader</button>
+            <button id="ocrSpeak" class="primary">Load + Speak</button>
+          </div>
+        </div>
+
+        <!-- GUTENBERG -->
         <div class="tab" id="tab-gutenberg" style="display:none;">
           <div class="muted">Search Project Gutenberg (via Gutendex).</div>
           <div style="height:10px;"></div>
@@ -305,16 +299,15 @@
           <div id="results"></div>
         </div>
 
+        <!-- EPUB -->
         <div class="tab" id="tab-epub" style="display:none;">
           <div class="muted">When an EPUB is loaded, chapters show here.</div>
           <div style="height:10px;"></div>
 
-          <div class="row" style="align-items:center;">
-            <label class="muted" style="display:flex; gap:8px; align-items:center;">
-              <input id="autoPlayEpub" type="checkbox" style="width:auto;" />
-              Auto-play next chapter
-            </label>
-          </div>
+          <label class="muted" style="display:flex; gap:8px; align-items:center;">
+            <input id="autoPlayEpub" type="checkbox" style="width:auto;" />
+            Auto-play next chapter
+          </label>
 
           <div class="row" style="margin-top:8px;">
             <button id="prevChapter" class="ghost">◀ Prev</button>
@@ -325,14 +318,12 @@
           <div id="epubStatus" class="status"></div>
         </div>
 
+        <!-- TIPS -->
         <div class="tab" id="tab-tips" style="display:none;">
           <div class="muted" style="line-height:1.6;">
-            <b>If changes don’t show on your phone:</b><br/>
-            You’re cached. See the “Uncache” steps I gave you below this code.<br/><br/>
-            <b>PDFs:</b><br/>
-            Some PDFs are just images (scans). Those won’t extract text without OCR. Text-based PDFs should work.<br/><br/>
-            <b>Best voice quality:</b><br/>
-            iOS voices depend on what’s installed: Settings → Accessibility → Spoken Content → Voices.
+            <b>Scanned PDFs:</b> You need OCR. For best results, screenshot a page and OCR the image.<br/><br/>
+            <b>If updates don’t show:</b> you’re cached. Bump the service worker cache version and reopen with ?v=4.<br/><br/>
+            <b>Best voices:</b> Settings → Accessibility → Spoken Content → Voices → download a high quality US male voice.
           </div>
         </div>
 
@@ -345,7 +336,7 @@
         <span class="muted" id="modeLabel">mode: text</span>
       </div>
       <div class="bd">
-        <div class="muted">Tap a sentence to jump. Long-press to scrub.</div>
+        <div class="muted">Tap a sentence to jump.</div>
 
         <div class="progressWrap">
           <div class="progressBar"><div id="progressFill" class="progressFill"></div></div>
@@ -353,7 +344,7 @@
         </div>
 
         <div style="height:10px;"></div>
-        <div id="reader">Load something, then press Speak.</div>
+        <div id="reader">Load something, then tap ▶ to speak.</div>
 
         <div id="ttsStatus" class="status"></div>
       </div>
@@ -401,27 +392,14 @@
   </div>
 </div>
 
-<!-- Scrub overlay -->
-<div id="scrubOverlay">
-  <div id="scrubCard">
-    <h3 style="margin:0 0 8px 0; font-size:14px;">Jump to a spot</h3>
-    <input id="scrubRange" type="range" min="0" max="0" value="0" />
-    <div class="row" style="margin-top:10px;">
-      <button id="scrubSet" class="primary">Set start here</button>
-      <button id="scrubSpeak" class="ghost">Set + Speak</button>
-      <button id="scrubCancel">Cancel</button>
-    </div>
-    <div id="scrubPreview"></div>
-  </div>
-</div>
-
-<div id="epubHidden"></div>
+<div id="epubHidden" style="position:absolute; left:-99999px; top:-99999px; width:900px; height:700px;"></div>
 
 <script>
   // Tabs
   const chips = [...document.querySelectorAll(".chip")];
   const tabs = {
     load: document.getElementById("tab-load"),
+    ocr: document.getElementById("tab-ocr"),
     gutenberg: document.getElementById("tab-gutenberg"),
     epub: document.getElementById("tab-epub"),
     tips: document.getElementById("tab-tips"),
@@ -460,6 +438,18 @@
   const progressFill = document.getElementById("progressFill");
   const progressText = document.getElementById("progressText");
 
+  // OCR DOM
+  const imgInput = document.getElementById("imgInput");
+  const ocrLang = document.getElementById("ocrLang");
+  const runOcr = document.getElementById("runOcr");
+  const ocrPreview = document.getElementById("ocrPreview");
+  const ocrStatus = document.getElementById("ocrStatus");
+  const ocrToReader = document.getElementById("ocrToReader");
+  const ocrSpeak = document.getElementById("ocrSpeak");
+  let ocrText = "";
+  let ocrImageURL = "";
+
+  // Gutenberg DOM
   const q = document.getElementById("q");
   const searchBtn = document.getElementById("searchBtn");
   const searchStatus = document.getElementById("searchStatus");
@@ -467,6 +457,7 @@
   const lang = document.getElementById("lang");
   const maxResults = document.getElementById("maxResults");
 
+  // EPUB DOM
   const tocEl = document.getElementById("toc");
   const epubStatus = document.getElementById("epubStatus");
   const autoPlayEpub = document.getElementById("autoPlayEpub");
@@ -474,19 +465,13 @@
   const nextChapterBtn = document.getElementById("nextChapter");
   const epubHidden = document.getElementById("epubHidden");
 
-  const scrubOverlay = document.getElementById("scrubOverlay");
-  const scrubRange = document.getElementById("scrubRange");
-  const scrubPreview = document.getElementById("scrubPreview");
-  const scrubSet = document.getElementById("scrubSet");
-  const scrubSpeak = document.getElementById("scrubSpeak");
-  const scrubCancel = document.getElementById("scrubCancel");
-
+  // Floating player
   const fabToggle = document.getElementById("fabToggle");
   const fabPanel = document.getElementById("fabPanel");
   const fabIcon = document.getElementById("fabIcon");
   const fabPct = document.getElementById("fabPct");
 
-  // PDF.js worker
+  // PDF worker
   if (window.pdfjsLib) {
     pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://unpkg.com/pdfjs-dist@4.10.38/build/pdf.worker.min.js";
@@ -519,7 +504,6 @@
     speaking: false,
 
     epub: null,
-    epubRendition: null,
     epubTocFlat: [],
     activeTocIndex: -1
   };
@@ -533,13 +517,6 @@
     docLabel.textContent = label || "Reader";
     modeLabel.textContent = "mode: " + (mode || "text");
   }
-  function escapeHtml(str){
-    return String(str).replace(/[&<>"']/g, s => ({
-      "&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;","'":"&#39;"
-    }[s]));
-  }
-  function escapeAttr(str){ return escapeHtml(str).replace(/"/g, "&quot;"); }
-
   function stripHtmlIfNeeded(text, filenameLower=""){
     if (!text) return "";
     const looksHtml =
@@ -553,7 +530,6 @@
     const out = (tmp.textContent || tmp.innerText || "").trim();
     return out.replace(/\n{3,}/g, "\n\n");
   }
-
   function htmlToText(html){
     const tmp = document.createElement("div");
     tmp.innerHTML = html || "";
@@ -561,14 +537,12 @@
     const text = (tmp.textContent || tmp.innerText || "").trim();
     return text.replace(/\n{3,}/g, "\n\n");
   }
-
   function splitIntoSentences(text){
     const t = (text || "").replace(/\r\n/g, "\n").trim();
     if (!t) return [];
     const parts = t.split(/(?<=[.!?])\s+(?=[A-Z0-9“"'\(\[])/g);
     return parts.map(s => s.trim()).filter(Boolean);
   }
-
   function renderReaderWithSentences(sentences){
     reader.innerHTML = "";
     state.sentenceEls = [];
@@ -584,7 +558,6 @@
     });
     reader.appendChild(frag);
   }
-
   function clearActiveHighlight(){
     for (const el of state.sentenceEls) if (el) el.classList.remove("active");
   }
@@ -596,7 +569,6 @@
     el.classList.add("active");
     try { el.scrollIntoView({ block:"center", behavior:"smooth" }); } catch(e){}
   }
-
   function updateProgress(){
     const total = state.sentences.length || 0;
     const idx = Math.max(0, Math.min(state.currentSentenceIndex, Math.max(0, total-1)));
@@ -636,10 +608,6 @@
       setStatus(ttsStatus, "Finished.", "ok");
       clearActiveHighlight();
       if (fabIcon) fabIcon.textContent = "▶";
-
-      if (state.mode === "epub" && autoPlayEpub.checked){
-        setTimeout(() => goToAdjacentChapter(+1, true), 350);
-      }
       return;
     }
 
@@ -675,26 +643,22 @@
     if (!vs || !vs.length) return;
     state.voices = vs;
     voiceSelect.innerHTML = "";
-
     const sorted = [...vs].sort((a,b) => {
       const aUS = (a.lang || "").toLowerCase().includes("en-us");
       const bUS = (b.lang || "").toLowerCase().includes("en-us");
       if (aUS !== bUS) return bUS - aUS;
       return (a.name || "").localeCompare(b.name || "");
     });
-
     for (const v of sorted){
       const opt = document.createElement("option");
       opt.value = v.name;
       opt.textContent = `${v.name} — ${v.lang}${v.default ? " (default)" : ""}`;
       voiceSelect.appendChild(opt);
     }
-
     const saved = localStorage.getItem(STORAGE.lastVoice);
     const preferred = saved && sorted.some(v => v.name === saved)
       ? saved
       : (sorted.find(v => (v.lang || "").toLowerCase().includes("en-us"))?.name || sorted[0]?.name);
-
     if (preferred) voiceSelect.value = preferred;
   }
 
@@ -703,7 +667,6 @@
     state.mode = mode;
     state.label = label || "Loaded";
     state.textRaw = text || "";
-
     state.sentences = splitIntoSentences(state.textRaw);
 
     let idx = parseInt(localStorage.getItem(STORAGE.resumeIdx) || "0", 10);
@@ -727,13 +690,13 @@
     updateProgress();
   }
 
-  // DOCX extraction
+  // DOCX
   async function docxToText(arrayBuffer){
     const result = await mammoth.extractRawText({ arrayBuffer });
     return (result && result.value ? result.value : "").replace(/\n{3,}/g, "\n\n").trim();
   }
 
-  // PDF extraction
+  // PDF
   async function pdfToText(arrayBuffer){
     if (!window.pdfjsLib) throw new Error("PDF engine not loaded");
     const loadingTask = pdfjsLib.getDocument({ data: arrayBuffer });
@@ -748,7 +711,7 @@
     return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
   }
 
-  // EPUB
+  // EPUB (kept minimal here)
   function flattenToc(toc, out=[]){
     for (const item of (toc || [])){
       out.push({ label: item.label || "(untitled)", href: item.href });
@@ -762,93 +725,205 @@
       b.classList.toggle("active", idx === state.activeTocIndex);
     });
   }
-  async function loadEpubChapterByIndex(idx, autoSpeak=false){
+  async function loadEpubChapterByIndex(idx){
     if (!state.epub || !state.epubTocFlat.length) return;
     if (idx < 0 || idx >= state.epubTocFlat.length) return;
-
-    stopSpeaking();
     state.activeTocIndex = idx;
     updateTocActive();
-
     const item = state.epubTocFlat[idx];
-    const label = item.label || `Chapter ${idx+1}`;
-    setStatus(epubStatus, `Loading: ${label}…`, "ok");
-
-    try{
-      const section = await state.epub.section(item.href);
-      const contents = await section.load(state.epub.load.bind(state.epub));
-      const html = contents?.document ? contents.document.documentElement.outerHTML : "";
-      const text = htmlToText(html);
-
-      localStorage.setItem(STORAGE.lastEpubHref, item.href);
-      localStorage.setItem(STORAGE.resumeIdx, "0");
-
-      loadText(text, `EPUB: ${label}`, "epub");
-      setTab("epub");
-      setStatus(epubStatus, `Loaded: ${label}`, "ok");
-
-      if (autoSpeak) speakFrom(0);
-    } catch(e){
-      console.error(e);
-      setStatus(epubStatus, "Could not load that chapter.", "warn");
-    }
-  }
-  function goToAdjacentChapter(delta, autoSpeak=false){
-    if (state.mode !== "epub" || !state.epubTocFlat.length) return;
-    const next = state.activeTocIndex + delta;
-    if (next < 0 || next >= state.epubTocFlat.length){
-      setStatus(epubStatus, "No more chapters.", "warn");
-      return;
-    }
-    loadEpubChapterByIndex(next, autoSpeak);
+    setStatus(epubStatus, `Loading: ${item.label}…`, "ok");
+    const section = await state.epub.section(item.href);
+    const contents = await section.load(state.epub.load.bind(state.epub));
+    const html = contents?.document ? contents.document.documentElement.outerHTML : "";
+    const text = htmlToText(html);
+    localStorage.setItem(STORAGE.resumeIdx, "0");
+    loadText(text, `EPUB: ${item.label}`, "epub");
+    setStatus(epubStatus, `Loaded: ${item.label}`, "ok");
   }
   async function loadEpubFromArrayBuffer(buf, label){
-    stopSpeaking();
     setStatus(epubStatus, "Loading EPUB…", "ok");
     tocEl.innerHTML = "";
     state.epubTocFlat = [];
     state.activeTocIndex = -1;
+    state.epub = ePub(buf);
+    state.epub.renderTo(epubHidden, { width:900, height:700 });
+    const nav = await state.epub.loaded.navigation;
+    state.epubTocFlat = flattenToc(nav?.toc || [], []);
+    tocEl.innerHTML = "";
+    state.epubTocFlat.forEach((it, idx) => {
+      const b = document.createElement("button");
+      b.textContent = it.label || "(untitled)";
+      b.dataset.idx = String(idx);
+      b.addEventListener("click", () => loadEpubChapterByIndex(idx));
+      tocEl.appendChild(b);
+    });
+    setStatus(fileStatus, label, "ok");
+    setTab("epub");
+    if (state.epubTocFlat.length) await loadEpubChapterByIndex(0);
+  }
+  prevChapterBtn.addEventListener("click", () => loadEpubChapterByIndex(Math.max(0, state.activeTocIndex - 1)));
+  nextChapterBtn.addEventListener("click", () => loadEpubChapterByIndex(Math.min(state.epubTocFlat.length - 1, state.activeTocIndex + 1)));
+
+  // Reader interactions
+  reader.addEventListener("click", (e) => {
+    const sent = e.target.closest(".sent");
+    if (!sent) return;
+    const idx = parseInt(sent.dataset.idx, 10);
+    if (Number.isNaN(idx)) return;
+    state.currentSentenceIndex = idx;
+    localStorage.setItem(STORAGE.resumeIdx, String(idx));
+    setActiveHighlight(idx);
+    updateProgress();
+    if (!setStartMode.checked) speakFrom(idx);
+    else setStatus(ttsStatus, "Start point set. Press Speak.", "ok");
+  });
+
+  // Floating toggle + hide-on-scroll
+  let panelOpen = false;
+  fabToggle.addEventListener("click", () => {
+    panelOpen = !panelOpen;
+    fabPanel.classList.toggle("open", panelOpen);
+    fabPanel.setAttribute("aria-hidden", panelOpen ? "false" : "true");
+  });
+  let scrollTimer = null;
+  reader.addEventListener("scroll", () => {
+    document.body.classList.add("hideFab");
+    if (scrollTimer) clearTimeout(scrollTimer);
+    scrollTimer = setTimeout(() => document.body.classList.remove("hideFab"), 420);
+  });
+
+  // File loading
+  fileInput.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    const name = (f.name || "file").toLowerCase();
+    setStatus(fileStatus, `Loading: ${f.name}…`, "ok");
 
     try{
-      state.epub = ePub(buf);
-      epubHidden.innerHTML = "";
-      state.epubRendition = state.epub.renderTo(epubHidden, { width:900, height:700 });
-
-      const nav = await state.epub.loaded.navigation;
-      const toc = nav?.toc ? nav.toc : [];
-      state.epubTocFlat = flattenToc(toc, []);
-
-      if (!state.epubTocFlat.length){
-        setStatus(epubStatus, "No TOC found. Trying spine…", "warn");
-        const spine = await state.epub.loaded.spine;
-        const first = spine?.items?.[0];
-        if (!first) throw new Error("No spine items.");
-        state.epubTocFlat = [{ label:"Start", href:first.href }];
+      if (name.endsWith(".epub") || f.type === "application/epub+zip"){
+        localStorage.setItem(STORAGE.resumeIdx, "0");
+        await loadEpubFromArrayBuffer(await f.arrayBuffer(), `Loaded EPUB: ${f.name}`);
+        return;
       }
 
-      tocEl.innerHTML = "";
-      state.epubTocFlat.forEach((it, idx) => {
-        const b = document.createElement("button");
-        b.textContent = it.label || "(untitled)";
-        b.dataset.idx = String(idx);
-        b.addEventListener("click", () => loadEpubChapterByIndex(idx, false));
-        tocEl.appendChild(b);
+      if (name.endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"){
+        const text = await docxToText(await f.arrayBuffer());
+        localStorage.setItem(STORAGE.resumeIdx, "0");
+        loadText(text, `Loaded DOCX: ${f.name}`, "text");
+        return;
+      }
+
+      if (name.endsWith(".pdf") || f.type === "application/pdf"){
+        const text = await pdfToText(await f.arrayBuffer());
+        if (!text || text.length < 10) {
+          setStatus(fileStatus, "This PDF looks scanned (image-only). Use the OCR tab with a screenshot/page image.", "warn");
+          loadText("", "PDF (no extractable text)", "text");
+        } else {
+          localStorage.setItem(STORAGE.resumeIdx, "0");
+          loadText(text, `Loaded PDF: ${f.name}`, "text");
+        }
+        return;
+      }
+
+      const raw = await f.text();
+      const cleaned = stripHtmlIfNeeded(raw, name);
+      localStorage.setItem(STORAGE.resumeIdx, "0");
+      loadText(cleaned, `Loaded file: ${f.name}`, "text");
+    } catch(err){
+      console.error(err);
+      setStatus(fileStatus, "Could not read that file.", "warn");
+    } finally {
+      fileInput.value = "";
+    }
+  });
+
+  usePaste.addEventListener("click", () => {
+    localStorage.setItem(STORAGE.resumeIdx, "0");
+    loadText(pasteBox.value || "", "Loaded pasted text", "text");
+  });
+  clearText.addEventListener("click", () => {
+    pasteBox.value = "";
+    localStorage.setItem(STORAGE.resumeIdx, "0");
+    loadText("", "Cleared", "text");
+  });
+
+  // OCR
+  imgInput.addEventListener("change", async (e) => {
+    const f = e.target.files && e.target.files[0];
+    if (!f) return;
+    if (ocrImageURL) URL.revokeObjectURL(ocrImageURL);
+    ocrImageURL = URL.createObjectURL(f);
+    ocrPreview.src = ocrImageURL;
+    ocrPreview.style.display = "block";
+    ocrText = "";
+    setStatus(ocrStatus, "Image loaded. Tap Run OCR.", "ok");
+  });
+
+  runOcr.addEventListener("click", async () => {
+    if (!ocrImageURL){
+      setStatus(ocrStatus, "Upload an image first.", "warn");
+      return;
+    }
+    if (!window.Tesseract){
+      setStatus(ocrStatus, "OCR engine not loaded (cached build or blocked). Refresh with ?v=4 and try again.", "warn");
+      return;
+    }
+
+    setStatus(ocrStatus, "OCR running… (this can take 15–60 seconds on iPhone)", "ok");
+
+    try{
+      const langCode = ocrLang.value;
+      const { data } = await Tesseract.recognize(ocrImageURL, langCode, {
+        logger: m => {
+          if (m.status && typeof m.progress === "number") {
+            const pct = Math.round(m.progress * 100);
+            setStatus(ocrStatus, `OCR: ${m.status} • ${pct}%`, "ok");
+          }
+        }
       });
 
-      setStatus(fileStatus, label, "ok");
-      setStatus(epubStatus, "EPUB ready.", "ok");
-      setTab("epub");
-
-      const savedHref = localStorage.getItem(STORAGE.lastEpubHref);
-      const startIdx = savedHref ? state.epubTocFlat.findIndex(x => x.href === savedHref) : 0;
-      await loadEpubChapterByIndex(startIdx >= 0 ? startIdx : 0, false);
-    } catch(e){
-      console.error(e);
-      setStatus(epubStatus, "Failed to load EPUB.", "warn");
+      ocrText = (data && data.text ? data.text : "").trim();
+      if (!ocrText) {
+        setStatus(ocrStatus, "OCR finished but found little or no text. Try a sharper/closer photo.", "warn");
+      } else {
+        setStatus(ocrStatus, `OCR complete. ${ocrText.length.toLocaleString()} characters found.`, "ok");
+      }
+    } catch (err){
+      console.error(err);
+      setStatus(ocrStatus, "OCR failed. Try a smaller image or screenshot a single page.", "warn");
     }
-  }
+  });
 
-  // Gutenberg
+  ocrToReader.addEventListener("click", () => {
+    if (!ocrText) { setStatus(ocrStatus, "Run OCR first.", "warn"); return; }
+    localStorage.setItem(STORAGE.resumeIdx, "0");
+    loadText(ocrText, "OCR text", "text");
+  });
+
+  ocrSpeak.addEventListener("click", () => {
+    if (!ocrText) { setStatus(ocrStatus, "Run OCR first.", "warn"); return; }
+    localStorage.setItem(STORAGE.resumeIdx, "0");
+    loadText(ocrText, "OCR text", "text");
+    speakFrom(0);
+  });
+
+  // Controls
+  speakBtn.addEventListener("click", () => speakFrom(state.currentSentenceIndex || 0));
+  pauseBtn.addEventListener("click", () => { try { speechSynthesis.pause(); } catch(e){} if (fabIcon) fabIcon.textContent = "▶"; });
+  resumeBtn.addEventListener("click", () => { try { speechSynthesis.resume(); } catch(e){} if (fabIcon) fabIcon.textContent = "⏸"; });
+  stopBtn.addEventListener("click", stopSpeaking);
+
+  voiceSelect.addEventListener("change", () => localStorage.setItem(STORAGE.lastVoice, voiceSelect.value));
+  rate.addEventListener("change", () => localStorage.setItem(STORAGE.lastRate, String(rate.value)));
+  pitch.addEventListener("change", () => localStorage.setItem(STORAGE.lastPitch, String(pitch.value)));
+  highlightToggle.addEventListener("change", () => {
+    localStorage.setItem(STORAGE.highlight, highlightToggle.checked ? "1" : "0");
+    if (!highlightToggle.checked) clearActiveHighlight();
+    else setActiveHighlight(state.currentSentenceIndex);
+  });
+  setStartMode.addEventListener("change", () => localStorage.setItem(STORAGE.setStartMode, setStartMode.checked ? "1" : "0"));
+
+  // Gutenberg (minimal)
   async function gutendexSearch(query, language, limit){
     const params = new URLSearchParams();
     params.set("search", query);
@@ -874,295 +949,58 @@
     const hit = keys.find(k => k.toLowerCase().includes("application/epub+zip"));
     return hit ? formats[hit] : null;
   }
-  function trimGutenbergBoilerplate(text){
-    const t = text || "";
-    const startMarkers = [
-      "*** START OF THE PROJECT GUTENBERG EBOOK",
-      "***START OF THE PROJECT GUTENBERG EBOOK",
-      "*** START OF THIS PROJECT GUTENBERG EBOOK",
-      "***START OF THIS PROJECT GUTENBERG EBOOK"
-    ];
-    const endMarkers = [
-      "*** END OF THE PROJECT GUTENBERG EBOOK",
-      "***END OF THE PROJECT GUTENBERG EBOOK",
-      "*** END OF THIS PROJECT GUTENBERG EBOOK",
-      "***END OF THIS PROJECT GUTENBERG EBOOK"
-    ];
-    let start = 0;
-    for (const m of startMarkers){
-      const i = t.indexOf(m);
-      if (i !== -1){ start = i; break; }
-    }
-    if (start > 0){
-      const nl = t.indexOf("\n", start);
-      if (nl !== -1) start = nl + 1;
-    }
-    let end = t.length;
-    for (const m of endMarkers){
-      const i = t.indexOf(m);
-      if (i !== -1){ end = i; break; }
-    }
-    const sliced = t.slice(start, end).trim();
-    return sliced.length > 200 ? sliced : t.trim();
-  }
-  async function loadGutenbergText(url, title){
-    try{
-      setStatus(searchStatus, "Loading text…", "ok");
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("Fetch failed");
-      const text = await res.text();
-      localStorage.setItem(STORAGE.resumeIdx, "0");
-      loadText(trimGutenbergBoilerplate(text), `Gutenberg: ${title}`, "text");
-      setStatus(searchStatus, "Loaded.", "ok");
-    } catch {
-      setStatus(searchStatus, "Direct load blocked. Download and upload instead.", "warn");
-    }
-  }
-  async function loadGutenbergEpub(url, title){
-    try{
-      setStatus(searchStatus, "Fetching EPUB…", "ok");
-      const res = await fetch(url);
-      if (!res.ok) throw new Error("EPUB fetch failed");
-      const buf = await res.arrayBuffer();
-      await loadEpubFromArrayBuffer(buf, `Gutenberg EPUB: ${title}`);
-      setStatus(searchStatus, "EPUB loaded.", "ok");
-    } catch {
-      setStatus(searchStatus, "Direct EPUB read blocked (CORS). Download EPUB and upload.", "warn");
-    }
-  }
-
-  // Scrubber
-  let pressTimer = null;
-  function openScrubber(atIdx){
-    if (!state.sentences.length) return;
-    scrubRange.max = String(state.sentences.length - 1);
-    scrubRange.value = String(atIdx);
-    updateScrubPreview(atIdx);
-    scrubOverlay.style.display = "flex";
-  }
-  function closeScrubber(){ scrubOverlay.style.display = "none"; }
-  function updateScrubPreview(idx){
-    const s = state.sentences[idx] || "";
-    const preview = s.length > 420 ? s.slice(0,420) + "…" : s;
-    scrubPreview.textContent = `Sentence ${idx+1} of ${state.sentences.length}\n\n${preview}`;
-  }
-  scrubRange.addEventListener("input", () => updateScrubPreview(parseInt(scrubRange.value,10)));
-  scrubSet.addEventListener("click", () => {
-    const idx = parseInt(scrubRange.value,10);
-    state.currentSentenceIndex = idx;
-    localStorage.setItem(STORAGE.resumeIdx, String(idx));
-    setActiveHighlight(idx);
-    updateProgress();
-    setStatus(ttsStatus, `Start set: sentence ${idx+1}.`, "ok");
-    closeScrubber();
-  });
-  scrubSpeak.addEventListener("click", () => {
-    const idx = parseInt(scrubRange.value,10);
-    closeScrubber();
-    speakFrom(idx);
-  });
-  scrubCancel.addEventListener("click", closeScrubber);
-  scrubOverlay.addEventListener("click", (e) => { if (e.target === scrubOverlay) closeScrubber(); });
-
-  // Reader interactions
-  reader.addEventListener("click", (e) => {
-    const sent = e.target.closest(".sent");
-    if (!sent) return;
-    const idx = parseInt(sent.dataset.idx, 10);
-    if (Number.isNaN(idx)) return;
-
-    state.currentSentenceIndex = idx;
-    localStorage.setItem(STORAGE.resumeIdx, String(idx));
-    setActiveHighlight(idx);
-    updateProgress();
-
-    if (!setStartMode.checked) speakFrom(idx);
-    else setStatus(ttsStatus, "Start point set. Press Speak.", "ok");
-  });
-
-  reader.addEventListener("pointerdown", () => {
-    if (!state.sentences.length) return;
-    pressTimer = setTimeout(() => openScrubber(state.currentSentenceIndex || 0), 520);
-  });
-  reader.addEventListener("pointerup", () => { if (pressTimer) clearTimeout(pressTimer); });
-  reader.addEventListener("pointermove", () => { if (pressTimer) clearTimeout(pressTimer); });
-  reader.addEventListener("pointercancel", () => { if (pressTimer) clearTimeout(pressTimer); });
-
-  // Floating player toggle + hide-on-scroll
-  let panelOpen = false;
-  fabToggle.addEventListener("click", () => {
-    panelOpen = !panelOpen;
-    fabPanel.classList.toggle("open", panelOpen);
-    fabPanel.setAttribute("aria-hidden", panelOpen ? "false" : "true");
-  });
-  let scrollTimer = null;
-  reader.addEventListener("scroll", () => {
-    document.body.classList.add("hideFab");
-    if (scrollTimer) clearTimeout(scrollTimer);
-    scrollTimer = setTimeout(() => document.body.classList.remove("hideFab"), 420);
-  });
-
-  // File loading
-  fileInput.addEventListener("change", async (e) => {
-    const f = e.target.files && e.target.files[0];
-    if (!f) return;
-
-    const name = (f.name || "file").toLowerCase();
-    setStatus(fileStatus, `Loading: ${f.name}…`, "ok");
-
-    try{
-      // EPUB
-      if (name.endsWith(".epub") || f.type === "application/epub+zip"){
-        localStorage.setItem(STORAGE.resumeIdx, "0");
-        await loadEpubFromArrayBuffer(await f.arrayBuffer(), `Loaded EPUB: ${f.name}`);
-        return;
-      }
-
-      // DOCX
-      if (name.endsWith(".docx") || f.type === "application/vnd.openxmlformats-officedocument.wordprocessingml.document"){
-        const text = await docxToText(await f.arrayBuffer());
-        localStorage.setItem(STORAGE.resumeIdx, "0");
-        loadText(text, `Loaded DOCX: ${f.name}`, "text");
-        return;
-      }
-
-      // PDF
-      if (name.endsWith(".pdf") || f.type === "application/pdf"){
-        const text = await pdfToText(await f.arrayBuffer());
-        if (!text || text.length < 10) {
-          setStatus(fileStatus, "This PDF looks like a scan (image-only). Text extraction won’t work without OCR.", "warn");
-          loadText("", "PDF (no extractable text)", "text");
-        } else {
-          localStorage.setItem(STORAGE.resumeIdx, "0");
-          loadText(text, `Loaded PDF: ${f.name}`, "text");
-        }
-        return;
-      }
-
-      // Text / HTML
-      const raw = await f.text();
-      const cleaned = stripHtmlIfNeeded(raw, name);
-      localStorage.setItem(STORAGE.resumeIdx, "0");
-      loadText(cleaned, `Loaded file: ${f.name}`, "text");
-    } catch(err){
-      console.error(err);
-      setStatus(fileStatus,
-        "Could not read that file. If it’s a PDF: it may be scanned (image-only) or you’re still on a cached build.",
-        "warn"
-      );
-    } finally {
-      fileInput.value = "";
-    }
-  });
-
-  usePaste.addEventListener("click", () => {
-    localStorage.setItem(STORAGE.resumeIdx, "0");
-    loadText(pasteBox.value || "", "Loaded pasted text", "text");
-  });
-  clearText.addEventListener("click", () => {
-    pasteBox.value = "";
-    localStorage.setItem(STORAGE.resumeIdx, "0");
-    loadText("", "Cleared", "text");
-  });
-
-  // Controls
-  speakBtn.addEventListener("click", () => speakFrom(state.currentSentenceIndex || 0));
-  pauseBtn.addEventListener("click", () => { try { speechSynthesis.pause(); } catch(e){} if (fabIcon) fabIcon.textContent = "▶"; });
-  resumeBtn.addEventListener("click", () => { try { speechSynthesis.resume(); } catch(e){} if (fabIcon) fabIcon.textContent = "⏸"; });
-  stopBtn.addEventListener("click", stopSpeaking);
-
-  voiceSelect.addEventListener("change", () => localStorage.setItem(STORAGE.lastVoice, voiceSelect.value));
-  rate.addEventListener("change", () => localStorage.setItem(STORAGE.lastRate, String(rate.value)));
-  pitch.addEventListener("change", () => localStorage.setItem(STORAGE.lastPitch, String(pitch.value)));
-  highlightToggle.addEventListener("change", () => {
-    localStorage.setItem(STORAGE.highlight, highlightToggle.checked ? "1" : "0");
-    if (!highlightToggle.checked) clearActiveHighlight();
-    else setActiveHighlight(state.currentSentenceIndex);
-  });
-  setStartMode.addEventListener("change", () => localStorage.setItem(STORAGE.setStartMode, setStartMode.checked ? "1" : "0"));
-  autoPlayEpub.addEventListener("change", () => localStorage.setItem(STORAGE.autoPlay, autoPlayEpub.checked ? "1" : "0"));
-
-  prevChapterBtn.addEventListener("click", () => goToAdjacentChapter(-1, false));
-  nextChapterBtn.addEventListener("click", () => goToAdjacentChapter(+1, false));
-
-  // Gutenberg search
   async function doSearch(){
     const query = (q.value || "").trim();
     if (!query){ setStatus(searchStatus, "Type a search query.", "warn"); return; }
-    searchBtn.disabled = true;
     results.innerHTML = "";
     setStatus(searchStatus, "Searching…", "ok");
 
-    try{
-      const items = await gutendexSearch(query, lang.value, parseInt(maxResults.value,10));
-      results.innerHTML = "";
-      if (!items.length){
-        results.innerHTML = `<div class="muted">No results.</div>`;
-      } else {
-        items.forEach(b => {
-          const title = b.title || "Untitled";
-          const authors = (b.authors || []).map(a => a.name).join(", ") || "Unknown author";
-          const langs = (b.languages || []).join(", ") || "n/a";
-          const downloads = (b.download_count ?? 0).toLocaleString();
-          const textUrl = pickBestTextUrl(b.formats);
-          const epubUrl = pickEpubUrl(b.formats);
-
-          const div = document.createElement("div");
-          div.className = "result";
-          div.innerHTML = `
-            <div class="title">${escapeHtml(title)}</div>
-            <div class="meta">${escapeHtml(authors)} • lang: ${escapeHtml(langs)} • downloads: ${downloads}</div>
-            <div class="pills">
-              ${textUrl ? `<span class="pill" data-action="readText" data-url="${escapeAttr(textUrl)}">Read (text)</span>` : ""}
-              ${epubUrl ? `<span class="pill" data-action="readEpub" data-url="${escapeAttr(epubUrl)}">Read (EPUB)</span>` : ""}
-              ${textUrl ? `<a class="pill" href="${textUrl}" target="_blank" rel="noopener">Download text</a>` : ""}
-              ${epubUrl ? `<a class="pill" href="${epubUrl}" target="_blank" rel="noopener">Download EPUB</a>` : ""}
-            </div>
-          `;
-          div.addEventListener("click", async (e) => {
-            const pill = e.target.closest(".pill");
-            if (!pill) return;
-            const action = pill.getAttribute("data-action");
-            const url = pill.getAttribute("data-url");
-            if (action === "readText") await loadGutenbergText(url, title);
-            if (action === "readEpub") await loadGutenbergEpub(url, title);
-          });
-          results.appendChild(div);
-        });
-      }
-      setStatus(searchStatus, `Found ${items.length} result(s).`, "ok");
-    } catch(e){
-      console.error(e);
-      setStatus(searchStatus, "Search failed.", "warn");
-    } finally {
-      searchBtn.disabled = false;
+    const items = await gutendexSearch(query, lang.value, parseInt(maxResults.value,10));
+    if (!items.length){
+      results.innerHTML = `<div class="muted">No results.</div>`;
+      return;
     }
+
+    items.forEach(b => {
+      const title = b.title || "Untitled";
+      const authors = (b.authors || []).map(a => a.name).join(", ") || "Unknown author";
+      const textUrl = pickBestTextUrl(b.formats);
+      const epubUrl = pickEpubUrl(b.formats);
+
+      const div = document.createElement("div");
+      div.className = "result";
+      div.innerHTML = `
+        <div class="title">${title}</div>
+        <div class="meta">${authors}</div>
+        <div class="pills">
+          ${textUrl ? `<a class="pill" href="${textUrl}" target="_blank" rel="noopener">Download text</a>` : ""}
+          ${epubUrl ? `<a class="pill" href="${epubUrl}" target="_blank" rel="noopener">Download EPUB</a>` : ""}
+        </div>
+      `;
+      results.appendChild(div);
+    });
+
+    setStatus(searchStatus, `Found ${items.length} result(s).`, "ok");
   }
   searchBtn.addEventListener("click", () => { setTab("gutenberg"); doSearch(); });
-  q.addEventListener("keydown", (e) => { if (e.key === "Enter") { setTab("gutenberg"); doSearch(); } });
 
-  // Restore
+  // Restore & init voices
   function restore(){
     const savedRate = localStorage.getItem(STORAGE.lastRate);
     const savedPitch = localStorage.getItem(STORAGE.lastPitch);
     const savedVoice = localStorage.getItem(STORAGE.lastVoice);
     const savedHighlight = localStorage.getItem(STORAGE.highlight);
     const savedSetStart = localStorage.getItem(STORAGE.setStartMode);
-    const savedAuto = localStorage.getItem(STORAGE.autoPlay);
-
     if (savedRate) rate.value = savedRate;
     if (savedPitch) pitch.value = savedPitch;
     if (savedHighlight) highlightToggle.checked = savedHighlight === "1";
     if (savedSetStart) setStartMode.checked = savedSetStart === "1";
-    autoPlayEpub.checked = savedAuto === "1";
-
     populateVoices();
     if (savedVoice) voiceSelect.value = savedVoice;
 
     const lastText = localStorage.getItem(STORAGE.lastText) || "";
     const lastLabel = localStorage.getItem(STORAGE.lastLabel) || "Restored";
     const lastMode = localStorage.getItem(STORAGE.lastMode) || "text";
-
     if (lastText) loadText(lastText, lastLabel, lastMode);
     else { setDocTitle("Reader", "text"); updateProgress(); }
   }
@@ -1175,23 +1013,7 @@
   }
   restore();
 
-  // PWA install button (Android/desktop only)
-  let deferredPrompt = null;
-  const installBtn = document.getElementById("installBtn");
-  window.addEventListener("beforeinstallprompt", (e) => {
-    e.preventDefault();
-    deferredPrompt = e;
-    installBtn.style.display = "inline-block";
-  });
-  installBtn.addEventListener("click", async () => {
-    if (!deferredPrompt) return;
-    deferredPrompt.prompt();
-    await deferredPrompt.userChoice;
-    deferredPrompt = null;
-    installBtn.style.display = "none";
-  });
-
-  // Service worker
+  // Service worker registration
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch(() => {});
