@@ -27,8 +27,7 @@
     .logo{ width:34px; height:34px; border-radius:10px;
       background:linear-gradient(135deg, var(--brand), #8ab4ff);
       box-shadow: 0 10px 30px rgba(42,91,215,.25);
-      flex:0 0 auto;
-      margin-top:2px;
+      flex:0 0 auto; margin-top:2px;
     }
     h1{ margin:0; font-size:16px; }
     .sub{ margin:4px 0 0 0; font-size:12px; color:var(--muted); white-space:pre-wrap; }
@@ -98,7 +97,6 @@
     .dangerText{ color:#ff9f9f; }
 
     #reader{
-      white-space:pre-wrap;
       line-height:1.7;
       font-size:18px;
       padding:16px;
@@ -109,6 +107,14 @@
       overflow:auto;
       border:1px solid var(--stroke);
     }
+    .sent{
+      display:inline;
+      padding:.08em .05em;
+      border-radius:8px;
+      cursor:pointer;
+    }
+    .sent:hover{ background: rgba(255,255,255,.06); }
+    .sent.active{ background: rgba(42,91,215,.22); outline:1px solid rgba(42,91,215,.45); }
 
     .playerFab{
       position: fixed; right: 14px; bottom: 14px; z-index: 60;
@@ -125,7 +131,7 @@
       width:auto;
     }
     .fabPanel{
-      width: min(360px, calc(100vw - 28px));
+      width: min(380px, calc(100vw - 28px));
       border-radius: 16px;
       border: 1px solid var(--stroke);
       background: rgba(18,20,27,.92);
@@ -135,7 +141,14 @@
       display: none;
     }
     .fabPanel.open{ display: block; }
+    .tiny{ font-size:11px; color:var(--muted); }
   </style>
+
+  <!-- DOCX engine -->
+  <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js"></script>
+
+  <!-- PDF.js legacy build (reliable .js files) -->
+  <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/legacy/build/pdf.min.js"></script>
 </head>
 
 <body>
@@ -144,7 +157,7 @@
     <div class="logo"></div>
     <div>
       <h1>Pocket Reader</h1>
-      <div class="sub" id="aliveBanner">BUILD v12fix • JS: (starting...) • DOCX: (?) • PDF: (?)</div>
+      <div class="sub" id="aliveBanner">BUILD v20 • JS: starting…</div>
     </div>
   </div>
 
@@ -159,7 +172,7 @@
       <div class="bd">
 
         <div class="tab" id="tab-load">
-          <div class="muted">Use Any File on iPhone for best reliability.</div>
+          <div class="muted">Tip: Use “Any File” on iPhone for the most reliable picker.</div>
           <div style="height:10px;"></div>
 
           <div class="muted">Any File (recommended)</div>
@@ -168,7 +181,7 @@
           <div style="height:10px;"></div>
           <div class="muted">Filtered picker (optional)</div>
           <input id="fileInput" type="file"
-            accept=".txt,.text,.md,.html,.htm,.docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
+                 accept=".txt,.text,.md,.html,.htm,.docx,.pdf,application/pdf,application/vnd.openxmlformats-officedocument.wordprocessingml.document" />
 
           <div id="fileStatus" class="status"></div>
 
@@ -179,10 +192,13 @@
             <button id="usePaste" class="primary">Load pasted text</button>
             <button id="clearText" class="ghost">Clear</button>
           </div>
+
+          <div style="height:14px;"></div>
+          <div class="tiny">Start-from-here: tap any sentence in the Reader pane. It will highlight, and Speak will begin there.</div>
         </div>
 
         <div class="tab" id="tab-gutenberg" style="display:none;">
-          <div class="muted">Search Project Gutenberg (via Gutendex) and load into reader.</div>
+          <div class="muted">Search Project Gutenberg (via Gutendex) and load into Reader.</div>
           <div style="height:10px;"></div>
           <div class="row">
             <input id="gbQuery" type="text" placeholder="Search title or author" />
@@ -214,503 +230,464 @@
     </button>
 
     <div class="fabPanel" id="fabPanel">
+      <div class="muted">Voice</div>
       <select id="voiceSelect"></select>
-      <div class="row" style="margin-top:10px;">
+      <div class="tiny" id="voiceHint">Tip: iOS often exposes only a few usable voices to web apps. Samantha is commonly the best free option.</div>
+
+      <div style="height:10px;"></div>
+      <div class="row">
         <button id="speak" class="primary" style="width:auto;">▶ Speak</button>
         <button id="pause" class="ghost" style="width:auto;">⏸</button>
         <button id="resume" class="ghost" style="width:auto;">⏵</button>
         <button id="stop" class="ghost" style="width:auto;">■</button>
       </div>
-      <div style="height:10px;"></div>
+
+      <div style="height:12px;"></div>
       <div class="muted">Rate</div>
-      <input id="rate" type="range" min="0.7" max="1.2" value="1.0" step="0.05" />
-      <div style="height:10px;"></div>
+      <input id="rate" type="range" min="0.75" max="1.15" value="0.98" step="0.01" />
+
+      <div style="height:12px;"></div>
       <div class="muted">Pitch</div>
-      <input id="pitch" type="range" min="0.8" max="1.2" value="1.0" step="0.05" />
+      <input id="pitch" type="range" min="0.85" max="1.15" value="1.00" step="0.01" />
+
+      <div style="height:12px;"></div>
+      <div class="muted">Pause after sentence (ms)</div>
+      <input id="pauseMs" type="range" min="0" max="900" value="250" step="25" />
+      <div class="tiny" id="pauseMsLabel">250 ms</div>
     </div>
   </div>
 </div>
 
 <script>
-/* =========================
-   Self-healing library loader
-   ========================= */
-function loadScriptSequential(urls, testFn, label){
-  return new Promise(async (resolve, reject) => {
-    for (const url of urls){
-      try{
-        await new Promise((res, rej) => {
-          const s = document.createElement("script");
-          s.src = url;
-          s.async = true;
-          s.onload = () => res();
-          s.onerror = () => rej(new Error("Failed to load: " + url));
-          document.head.appendChild(s);
-        });
-        if (testFn()){
-          return resolve(url);
-        }
-      } catch(e){
-        // try next
-      }
+  // ===== Banner truth =====
+  const aliveBanner = document.getElementById("aliveBanner");
+  function setBanner(){
+    const jsOk = true;
+    const docxOk = typeof window.mammoth !== "undefined";
+    const pdfOk = typeof window.pdfjsLib !== "undefined";
+    aliveBanner.textContent = `BUILD v20 • JS: RUNNING ✅ • DOCX: ${docxOk ? "LOADED ✅" : "MISSING ❌"} • PDF: ${pdfOk ? "LOADED ✅" : "MISSING ❌"}`;
+  }
+  setBanner();
+
+  // ===== Tabs =====
+  const chips = [...document.querySelectorAll(".chip")];
+  const tabs = {
+    load: document.getElementById("tab-load"),
+    gutenberg: document.getElementById("tab-gutenberg"),
+  };
+  const leftTitle = document.getElementById("leftTitle");
+  function setTab(name){
+    chips.forEach(c => c.classList.toggle("active", c.dataset.tab === name));
+    Object.entries(tabs).forEach(([k,el]) => el.style.display = (k===name ? "block" : "none"));
+    leftTitle.textContent = name.charAt(0).toUpperCase() + name.slice(1);
+  }
+  chips.forEach(c => c.addEventListener("click", () => setTab(c.dataset.tab)));
+
+  // ===== DOM =====
+  const fileInput = document.getElementById("fileInput");
+  const anyFileInput = document.getElementById("anyFileInput");
+  const fileStatus = document.getElementById("fileStatus");
+
+  const reader = document.getElementById("reader");
+  const docLabel = document.getElementById("docLabel");
+  const modeLabel = document.getElementById("modeLabel");
+  const ttsStatus = document.getElementById("ttsStatus");
+
+  const voiceSelect = document.getElementById("voiceSelect");
+  const rate = document.getElementById("rate");
+  const pitch = document.getElementById("pitch");
+  const pauseMs = document.getElementById("pauseMs");
+  const pauseMsLabel = document.getElementById("pauseMsLabel");
+
+  const fabToggle = document.getElementById("fabToggle");
+  const fabPanel = document.getElementById("fabPanel");
+  const fabVoice = document.getElementById("fabVoice");
+  const fabIcon = document.getElementById("fabIcon");
+
+  function setStatus(el, msg, kind="ok"){
+    el.textContent = msg || "";
+    el.className = "status " + (kind==="warn" ? "warn" : (kind==="danger" ? "dangerText" : ""));
+  }
+
+  // ===== Reader + "Start here" =====
+  const state = {
+    textRaw: "",
+    voices: [],
+  };
+
+  let sentenceList = [];
+  let startIndex = 0;
+
+  function splitIntoSentences(text){
+    const t = (text || "").replace(/\r\n/g, "\n").trim();
+    if (!t) return [];
+
+    // Normalize spacing around newlines (helps sentence split)
+    const normalized = t.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+/g, " ");
+
+    // Sentence-ish split (not perfect, but stable and natural enough)
+    const parts = normalized.split(/(?<=[.!?])\s+(?=[A-Z0-9“"'\(\[])/g);
+    return parts.map(s => s.trim()).filter(Boolean);
+  }
+
+  function renderSentences(text){
+    sentenceList = splitIntoSentences(text);
+    startIndex = 0;
+
+    reader.innerHTML = "";
+    if (!sentenceList.length){
+      reader.textContent = "No text loaded.";
+      return;
     }
-    reject(new Error(label + " failed to load from all sources."));
-  });
-}
 
-const banner = document.getElementById("aliveBanner");
-function setBanner(jsOk, docxOk, pdfOk){
-  banner.textContent = `BUILD v12fix • JS: ${jsOk ? "RUNNING ✅" : "NO ❌"} • DOCX: ${docxOk ? "LOADED ✅" : "MISSING ❌"} • PDF: ${pdfOk ? "LOADED ✅" : "MISSING ❌"}`;
-}
-
-setBanner(true, false, false);
-
-/* =========================
-   UI wiring
-   ========================= */
-const chips = [...document.querySelectorAll(".chip")];
-const tabs = {
-  load: document.getElementById("tab-load"),
-  gutenberg: document.getElementById("tab-gutenberg"),
-};
-const leftTitle = document.getElementById("leftTitle");
-function setTab(name){
-  chips.forEach(c => c.classList.toggle("active", c.dataset.tab === name));
-  Object.entries(tabs).forEach(([k,el]) => el.style.display = (k===name ? "block" : "none"));
-  leftTitle.textContent = name.charAt(0).toUpperCase() + name.slice(1);
-}
-chips.forEach(c => c.addEventListener("click", () => setTab(c.dataset.tab)));
-
-const fileInput = document.getElementById("fileInput");
-const anyFileInput = document.getElementById("anyFileInput");
-const fileStatus = document.getElementById("fileStatus");
-
-const reader = document.getElementById("reader");
-const docLabel = document.getElementById("docLabel");
-const modeLabel = document.getElementById("modeLabel");
-const ttsStatus = document.getElementById("ttsStatus");
-
-function setStatus(el, msg, kind="ok"){
-  el.textContent = msg || "";
-  el.className = "status " + (kind==="warn" ? "warn" : (kind==="danger" ? "dangerText" : ""));
-}
-
-const state = { textRaw:"", voices:[] };
-
-function loadText(text, label){
-  const textToSpeak = sentenceList.slice(startIndex).join(" ");
-  docLabel.textContent = label || "Reader";
-  modeLabel.textContent = "mode: text";
-  renderSentences(state.textRaw);
-}
-
-function splitIntoSentences(text){
-  const t = (text || "").replace(/\r\n/g, "\n").trim();
-  if (!t) return [];
-  // decent sentence split
-  return t.split(/(?<=[.!?])\s+(?=[A-Z0-9“"'\(\[])/g).map(s => s.trim()).filter(Boolean);
-}
-
-function renderSentences(text){
-  sentenceList = splitIntoSentences(text);
-  startIndex = 0;
-
-  reader.innerHTML = "";
-  sentenceList.forEach((s, i) => {
-    const span = document.createElement("span");
-    span.className = "sent";
-    span.dataset.i = String(i);
-    span.textContent = s + " ";
-    span.addEventListener("click", () => {
-      startIndex = i;
-      // highlight
-      [...reader.querySelectorAll(".sent")].forEach(el => el.classList.remove("active"));
-      span.classList.add("active");
-      setStatus(ttsStatus, `Start set at sentence ${i+1}.`, "ok");
+    sentenceList.forEach((s, i) => {
+      const span = document.createElement("span");
+      span.className = "sent";
+      span.dataset.i = String(i);
+      span.textContent = s + " ";
+      span.addEventListener("click", () => {
+        startIndex = i;
+        [...reader.querySelectorAll(".sent")].forEach(el => el.classList.remove("active"));
+        span.classList.add("active");
+        setStatus(ttsStatus, `Start set at sentence ${i+1}.`, "ok");
+      });
+      reader.appendChild(span);
     });
-    reader.appendChild(span);
-  });
 
-  if (!sentenceList.length) reader.textContent = "No text loaded.";
-}
-
-/* =========================
-   Library-backed file handlers
-   ========================= */
-async function docxToText(arrayBuffer){
-  if (!window.mammoth) throw new Error("DOCX engine not loaded (mammoth).");
-  const result = await window.mammoth.extractRawText({ arrayBuffer });
-  return (result && result.value ? result.value : "").replace(/\n{3,}/g, "\n\n").trim();
-}
-
-async function pdfToText(arrayBuffer){
-  if (typeof window.pdfjsLib === "undefined") throw new Error("PDF engine not loaded (pdfjsLib).");
-
-  // worker
-  window.pdfjsLib.GlobalWorkerOptions.workerSrc =
-  "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/legacy/build/pdf.worker.min.js";
-
-  const bytes = new Uint8Array(arrayBuffer);
-
-  const loadingTask = window.pdfjsLib.getDocument({
-    data: bytes,
-    disableAutoFetch: true,
-    disableStream: true,
-    disableRange: true,
-    stopAtErrors: false,
-    verbosity: 0
-  });
-
-  loadingTask.onPassword = (updatePassword) => {
-    const pw = prompt("PDF is password-protected. Enter password:");
-    if (pw) updatePassword(pw);
-  };
-
-  const pdf = await loadingTask.promise;
-
-  let out = [];
-  for (let p = 1; p <= pdf.numPages; p++){
-    const page = await pdf.getPage(p);
-    const tc = await page.getTextContent();
-    const pageText = tc.items.map(it => it.str).join(" ");
-    out.push(pageText);
+    // auto-highlight first sentence
+    const first = reader.querySelector(".sent");
+    if (first) first.classList.add("active");
   }
-  return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
-}
 
-async function handleFile(f){
-  if (!f) return;
+  function loadText(text, label){
+    state.textRaw = (text || "").trim();
+    docLabel.textContent = label || "Reader";
+    modeLabel.textContent = "mode: text";
+    renderSentences(state.textRaw);
+  }
 
-  setStatus(fileStatus,
-    `Picked:\nName: ${f.name || "(no name)"}\nType: ${f.type || "(blank)"}\nSize: ${(f.size/1024).toFixed(0)} KB`,
-    "ok"
-  );
+  // ===== DOCX =====
+  async function docxToText(arrayBuffer){
+    if (!window.mammoth) throw new Error("DOCX engine not loaded.");
+    const result = await window.mammoth.extractRawText({ arrayBuffer });
+    return (result && result.value ? result.value : "")
+      .replace(/\n{3,}/g, "\n\n")
+      .trim();
+  }
 
-  const lower = (f.name || "").toLowerCase();
+  // ===== PDF =====
+  async function pdfToText(arrayBuffer){
+    if (typeof window.pdfjsLib === "undefined") throw new Error("PDF engine not loaded.");
 
-  try{
-    if (lower.endsWith(".docx") || (f.type||"").includes("wordprocessingml")){
-      const text = await docxToText(await f.arrayBuffer());
-      loadText(text, `DOCX: ${f.name}`);
-      setStatus(fileStatus, "Loaded DOCX successfully.", "ok");
-      return;
+    // worker must match pdfjs version
+    window.pdfjsLib.GlobalWorkerOptions.workerSrc =
+      "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/legacy/build/pdf.worker.min.js";
+
+    const bytes = new Uint8Array(arrayBuffer);
+    const task = window.pdfjsLib.getDocument({
+      data: bytes,
+      disableAutoFetch: true,
+      disableStream: true,
+      disableRange: true,
+      stopAtErrors: false,
+      verbosity: 0
+    });
+
+    task.onPassword = (updatePassword) => {
+      const pw = prompt("PDF is password-protected. Enter password:");
+      if (pw) updatePassword(pw);
+    };
+
+    const pdf = await task.promise;
+
+    let out = [];
+    for (let p = 1; p <= pdf.numPages; p++){
+      const page = await pdf.getPage(p);
+      const tc = await page.getTextContent();
+      const pageText = tc.items.map(it => it.str).join(" ");
+      out.push(pageText);
     }
 
-    if (lower.endsWith(".pdf") || (f.type||"").includes("pdf")){
-      const text = await pdfToText(await f.arrayBuffer());
-      if (!text || text.length < 20){
-        setStatus(fileStatus, "PDF opened, but no extractable text (likely scanned). OCR is the next step.", "warn");
-        loadText("", `PDF (no text): ${f.name}`);
-      } else {
-        loadText(text, `PDF: ${f.name}`);
-        setStatus(fileStatus, "Loaded PDF text successfully.", "ok");
+    return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
+  }
+
+  async function handleFile(f){
+    if (!f) return;
+
+    setStatus(fileStatus,
+      `Picked:\nName: ${f.name || "(no name)"}\nType: ${f.type || "(blank)"}\nSize: ${(f.size/1024).toFixed(0)} KB`,
+      "ok"
+    );
+
+    const lower = (f.name || "").toLowerCase();
+
+    try{
+      // DOCX
+      if (lower.endsWith(".docx") || (f.type||"").includes("wordprocessingml")){
+        const text = await docxToText(await f.arrayBuffer());
+        loadText(text, `DOCX: ${f.name}`);
+        setStatus(fileStatus, "Loaded DOCX successfully.", "ok");
+        return;
       }
-      return;
+
+      // PDF
+      if (lower.endsWith(".pdf") || (f.type||"").includes("pdf")){
+        const text = await pdfToText(await f.arrayBuffer());
+        if (!text || text.length < 20){
+          setStatus(fileStatus, "PDF opened, but it has no extractable text (likely scanned). OCR is not included in this build.", "warn");
+          loadText("", `PDF (no text): ${f.name}`);
+        } else {
+          loadText(text, `PDF: ${f.name}`);
+          setStatus(fileStatus, "Loaded PDF text successfully.", "ok");
+        }
+        return;
+      }
+
+      // fallback: text
+      const raw = await f.text();
+      loadText(raw, `File: ${f.name}`);
+      setStatus(fileStatus, "Loaded as text.", "ok");
+    } catch(err){
+      console.error(err);
+      setStatus(fileStatus, `Open failed:\n${err?.message || String(err)}`, "danger");
     }
-
-    // text fallback
-    const raw = await f.text();
-    loadText(raw, `File: ${f.name}`);
-    setStatus(fileStatus, "Loaded as text.", "ok");
-  } catch(err){
-    console.error(err);
-    setStatus(fileStatus, `Open failed:\n${err?.message || String(err)}`, "danger");
   }
-}
 
-anyFileInput.addEventListener("change", e => handleFile(e.target.files && e.target.files[0]));
-fileInput.addEventListener("change", e => handleFile(e.target.files && e.target.files[0]));
+  anyFileInput.addEventListener("change", e => handleFile(e.target.files && e.target.files[0]));
+  fileInput.addEventListener("change", e => handleFile(e.target.files && e.target.files[0]));
 
-// Paste
-document.getElementById("usePaste").addEventListener("click", () => {
-  loadText(document.getElementById("pasteBox").value || "", "Pasted text");
-});
-document.getElementById("clearText").addEventListener("click", () => {
-  document.getElementById("pasteBox").value = "";
-  loadText("", "Cleared");
-});
+  // Paste
+  document.getElementById("usePaste").addEventListener("click", () => {
+    loadText(document.getElementById("pasteBox").value || "", "Pasted text");
+  });
+  document.getElementById("clearText").addEventListener("click", () => {
+    document.getElementById("pasteBox").value = "";
+    loadText("", "Cleared");
+    setStatus(ttsStatus, "", "ok");
+  });
 
-/* =========================
-   Gutenberg
-   ========================= */
-const gbQuery = document.getElementById("gbQuery");
-const gbSearch = document.getElementById("gbSearch");
-const gbStatus = document.getElementById("gbStatus");
-const gbResults = document.getElementById("gbResults");
+  // ===== Gutenberg =====
+  const gbQuery = document.getElementById("gbQuery");
+  const gbSearch = document.getElementById("gbSearch");
+  const gbStatus = document.getElementById("gbStatus");
+  const gbResults = document.getElementById("gbResults");
 
-function esc(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
+  function esc(s){ return (s||"").replace(/[&<>"']/g, c => ({'&':'&amp;','<':'&lt;','>':'&gt;','"':'&quot;',"'":'&#39;'}[c])); }
 
-async function gutenbergSearch(q){
-  gbResults.innerHTML = "";
-  gbStatus.textContent = "Searching…";
-  const url = `https://gutendex.com/books/?search=${encodeURIComponent(q)}`;
-  const r = await fetch(url);
-  if (!r.ok) throw new Error("Search failed");
-  const data = await r.json();
-  gbStatus.textContent = `Found ${data.results.length} results (showing up to 10).`;
-
-  const top = data.results.slice(0,10);
-  gbResults.innerHTML = top.map(b => {
-    const title = esc(b.title);
-    const author = esc((b.authors && b.authors[0] && b.authors[0].name) ? b.authors[0].name : "Unknown");
-    const txt = b.formats?.["text/plain; charset=utf-8"] || b.formats?.["text/plain"] || "";
-    const html = b.formats?.["text/html; charset=utf-8"] || b.formats?.["text/html"] || "";
-    const best = txt || html;
-    const btn = best ? `<button data-url="${esc(best)}" class="primary" style="margin-top:6px;">Load</button>` : `<div class="muted">No text format available.</div>`;
-    return `
-      <div style="border:1px solid #2b3150;border-radius:12px;padding:10px;margin-top:10px;background:#0f1220;">
-        <div style="font-weight:900;">${title}</div>
-        <div class="muted" style="font-size:11px;">${author}</div>
-        ${btn}
-      </div>
-    `;
-  }).join("");
-}
-
-gbSearch.addEventListener("click", async () => {
-  const q = (gbQuery.value || "").trim();
-  if (!q) return;
-  try{ await gutenbergSearch(q); }
-  catch(e){ gbStatus.textContent = "Gutenberg search failed. Check your connection."; }
-});
-
-gbResults.addEventListener("click", async (e) => {
-  const btn = e.target.closest("button[data-url]");
-  if (!btn) return;
-  const url = btn.getAttribute("data-url");
-  gbStatus.textContent = "Downloading…";
-  try{
+  async function gutenbergSearch(q){
+    gbResults.innerHTML = "";
+    gbStatus.textContent = "Searching…";
+    const url = `https://gutendex.com/books/?search=${encodeURIComponent(q)}`;
     const r = await fetch(url);
-    const text = await r.text();
-    loadText(text, "Gutenberg book");
-    gbStatus.textContent = "Loaded into Reader.";
-    setTab("load");
-  } catch(e){
-    gbStatus.textContent = "Could not download that book format.";
+    if (!r.ok) throw new Error("Search failed");
+    const data = await r.json();
+    gbStatus.textContent = `Found ${data.results.length} results (showing up to 10).`;
+
+    const top = data.results.slice(0,10);
+    gbResults.innerHTML = top.map(b => {
+      const title = esc(b.title);
+      const author = esc((b.authors && b.authors[0] && b.authors[0].name) ? b.authors[0].name : "Unknown");
+      const txt = b.formats?.["text/plain; charset=utf-8"] || b.formats?.["text/plain"] || "";
+      const html = b.formats?.["text/html; charset=utf-8"] || b.formats?.["text/html"] || "";
+      const best = txt || html;
+      const btn = best ? `<button data-url="${esc(best)}" class="primary" style="margin-top:6px;">Load</button>` : `<div class="muted">No text format available.</div>`;
+      return `
+        <div style="border:1px solid #2b3150;border-radius:12px;padding:10px;margin-top:10px;background:#0f1220;">
+          <div style="font-weight:900;">${title}</div>
+          <div class="muted" style="font-size:11px;">${author}</div>
+          ${btn}
+        </div>
+      `;
+    }).join("");
   }
-});
 
-/* =========================
-   TTS
-   ========================= */
-
-
-const voiceSelect = document.getElementById("voiceSelect");
-const rate = document.getElementById("rate");
-const pitch = document.getElementById("pitch");
-const fabToggle = document.getElementById("fabToggle");
-const fabPanel = document.getElementById("fabPanel");
-const fabVoice = document.getElementById("fabVoice");
-const fabIcon = document.getElementById("fabIcon");
-
-let panelOpen = false;
-fabToggle.addEventListener("click", () => {
-  panelOpen = !panelOpen;
-  fabPanel.classList.toggle("open", panelOpen);
-});
-
-function chooseBestVoice(voices){
-  // Prefer US English, then "Siri" / "Enhanced" style names when present.
-  const enUS = voices.filter(v => (v.lang || "").toLowerCase() === "en-us");
-  const pool = enUS.length ? enUS : voices;
-
-  const rank = (v) => {
-    const name = (v.name || "").toLowerCase();
-    let score = 0;
-    if ((v.lang || "").toLowerCase() === "en-us") score += 100;
-    if (name.includes("siri")) score += 30;
-    if (name.includes("enhanced")) score += 25;
-    if (name.includes("premium")) score += 20;
-    if (name.includes("male")) score += 8; // not reliable, but harmless
-    return score;
-  };
-
-  return pool.slice().sort((a,b) => rank(b) - rank(a))[0] || null;
-}
-
-function populateVoices(){
-  const vs = speechSynthesis.getVoices();
-  if (!vs || !vs.length) return;
-
-  state.voices = vs;
-  voiceSelect.innerHTML = "";
-
-  const sorted = [...vs].sort((a,b) => {
-    const aUS = (a.lang || "").toLowerCase() === "en-us";
-    const bUS = (b.lang || "").toLowerCase() === "en-us";
-    if (aUS !== bUS) return bUS - aUS;
-    return (a.name || "").localeCompare(b.name || "");
+  gbSearch.addEventListener("click", async () => {
+    const q = (gbQuery.value || "").trim();
+    if (!q) return;
+    try{ await gutenbergSearch(q); }
+    catch(e){ gbStatus.textContent = "Gutenberg search failed. Check your connection."; }
   });
 
-  sorted.forEach(v => {
-    const opt = document.createElement("option");
-    opt.value = v.name;
-    opt.textContent = `${v.name} — ${v.lang}`;
-    voiceSelect.appendChild(opt);
+  gbResults.addEventListener("click", async (e) => {
+    const btn = e.target.closest("button[data-url]");
+    if (!btn) return;
+    const url = btn.getAttribute("data-url");
+    gbStatus.textContent = "Downloading…";
+    try{
+      const r = await fetch(url);
+      const text = await r.text();
+      loadText(text, "Gutenberg book");
+      gbStatus.textContent = "Loaded into Reader.";
+      setTab("load");
+    } catch(e){
+      gbStatus.textContent = "Could not download that book format.";
+    }
   });
 
-  const best = chooseBestVoice(sorted);
-  if (best) voiceSelect.value = best.name;
-
-  fabVoice.textContent = best ? `Voice: ${best.lang}` : "Voice ready";
-}
-
-function stopSpeak(){ try{ speechSynthesis.cancel(); } catch(e){} fabIcon.textContent="▶"; }
-
-const pauseMs = document.getElementById("pauseMs");
-const pauseMsLabel = document.getElementById("pauseMsLabel");
-
-function updatePauseLabel(){
-  if (pauseMsLabel) pauseMsLabel.textContent = `${pauseMs.value} ms`;
-}
-if (pauseMs) pauseMs.addEventListener("input", updatePauseLabel);
-updatePauseLabel();
-
-let speakQueue = [];
-let speaking = false;
-let stopped = false;
-
-function splitSentences(text){
-  const t = (text || "").replace(/\r\n/g, "\n").trim();
-  if (!t) return [];
-  // Sentence-ish split. Good enough for natural pacing.
-  const parts = t.split(/(?<=[.!?])\s+(?=[A-Z0-9“"'\(\[])/g);
-  return parts.map(s => s.trim()).filter(Boolean);
-}
-
-function chunkLongSentence(sentence, maxLen = 220){
-  if (sentence.length <= maxLen) return [sentence];
-  const chunks = [];
-  let s = sentence;
-  while (s.length > maxLen){
-    // Try to split at a comma or space near the limit.
-    let cut = s.lastIndexOf(",", maxLen);
-    if (cut < 80) cut = s.lastIndexOf(" ", maxLen);
-    if (cut < 80) cut = maxLen;
-    chunks.push(s.slice(0, cut + 1).trim());
-    s = s.slice(cut + 1).trim();
+  // ===== TTS (natural pacing + start-here) =====
+  function updatePauseLabel(){
+    pauseMsLabel.textContent = `${pauseMs.value} ms`;
   }
-  if (s) chunks.push(s);
-  return chunks;
-}
+  pauseMs.addEventListener("input", updatePauseLabel);
+  updatePauseLabel();
 
-function stopSpeak(){
-  stopped = true;
-  speaking = false;
-  speakQueue = [];
-  try { speechSynthesis.cancel(); } catch(e){}
-  fabIcon.textContent = "▶";
-}
+  let panelOpen = false;
+  fabToggle.addEventListener("click", () => {
+    panelOpen = !panelOpen;
+    fabPanel.classList.toggle("open", panelOpen);
+  });
 
-function speakAll(){
-  if (!state.textRaw.trim()){
-    setStatus(ttsStatus, "No text loaded.", "warn");
-    return;
+  function chooseBestVoice(voices){
+    if (!voices || !voices.length) return null;
+
+    // Prefer en-US, then names that tend to be better.
+    const pool = voices.filter(v => (v.lang || "").toLowerCase() === "en-us");
+    const list = pool.length ? pool : voices;
+
+    const rank = (v) => {
+      const name = (v.name || "").toLowerCase();
+      let score = 0;
+      if ((v.lang || "").toLowerCase() === "en-us") score += 100;
+      if (name.includes("samantha")) score += 30;
+      if (name.includes("siri")) score += 20;
+      if (name.includes("enhanced")) score += 15;
+      if (name.includes("premium")) score += 10;
+      return score;
+    };
+
+    return list.slice().sort((a,b) => rank(b) - rank(a))[0] || null;
   }
 
-  stopSpeak(); // clears any prior state
-  stopped = false;
-  fabIcon.textContent = "⏸";
+  function populateVoices(){
+    const vs = speechSynthesis.getVoices();
+    if (!vs || !vs.length) return;
 
-  const v = state.voices.find(x => x.name === voiceSelect.value) || chooseBestVoice(state.voices);
+    state.voices = vs;
 
-  // Build queue: sentences, then chunk long ones
-  const sentences = splitSentences(state.textRaw);
-  const q = [];
-  for (const sent of sentences){
-    const chunks = chunkLongSentence(sent, 220);
-    for (const c of chunks) q.push(c);
-    // Add a special pause marker after each sentence
-    q.push({ __pause: true, ms: parseInt(pauseMs?.value || "250", 10) });
-    // Extra pause if sentence ends a paragraph (simple heuristic)
-    if (/\n\s*\n/.test(sent)) q.push({ __pause: true, ms: 350 });
+    // Show en-US first; keep others but de-emphasize
+    const sorted = [...vs].sort((a,b) => {
+      const aUS = (a.lang || "").toLowerCase() === "en-us";
+      const bUS = (b.lang || "").toLowerCase() === "en-us";
+      if (aUS !== bUS) return bUS - aUS;
+      return (a.name || "").localeCompare(b.name || "");
+    });
+
+    voiceSelect.innerHTML = "";
+    sorted.forEach(v => {
+      const opt = document.createElement("option");
+      opt.value = v.name;
+      opt.textContent = `${v.name} — ${v.lang}`;
+      voiceSelect.appendChild(opt);
+    });
+
+    const best = chooseBestVoice(sorted);
+    if (best) voiceSelect.value = best.name;
+
+    fabVoice.textContent = best ? `Voice: ${best.name}` : "Voice ready";
   }
-  speakQueue = q;
-  speaking = true;
 
-  const speakNext = () => {
-    if (stopped || !speaking) return;
-    if (!speakQueue.length){
-      speaking = false;
-      fabIcon.textContent = "▶";
+  if (typeof speechSynthesis !== "undefined"){
+    populateVoices();
+    speechSynthesis.onvoiceschanged = populateVoices;
+  }
+
+  let speakQueue = [];
+  let speaking = false;
+  let stopped = false;
+
+  function chunkLongSentence(sentence, maxLen = 220){
+    if (sentence.length <= maxLen) return [sentence];
+    const chunks = [];
+    let s = sentence;
+    while (s.length > maxLen){
+      let cut = s.lastIndexOf(",", maxLen);
+      if (cut < 80) cut = s.lastIndexOf(" ", maxLen);
+      if (cut < 80) cut = maxLen;
+      chunks.push(s.slice(0, cut + 1).trim());
+      s = s.slice(cut + 1).trim();
+    }
+    if (s) chunks.push(s);
+    return chunks;
+  }
+
+  function stopSpeak(){
+    stopped = true;
+    speaking = false;
+    speakQueue = [];
+    try { speechSynthesis.cancel(); } catch(e){}
+    fabIcon.textContent = "▶";
+  }
+
+  function speakFromHere(){
+    if (!sentenceList.length){
+      setStatus(ttsStatus, "No text loaded.", "warn");
       return;
     }
 
-    const item = speakQueue.shift();
+    stopSpeak(); // clear prior state
+    stopped = false;
+    speaking = true;
+    fabIcon.textContent = "⏸";
 
-    if (item && item.__pause){
-      setTimeout(speakNext, item.ms || 250);
-      return;
+    const voice = state.voices.find(v => v.name === voiceSelect.value) || chooseBestVoice(state.voices);
+    const pause = parseInt(pauseMs.value || "250", 10);
+
+    // Build queue: sentences from startIndex
+    const q = [];
+    for (let i = startIndex; i < sentenceList.length; i++){
+      const sent = sentenceList[i];
+      const chunks = chunkLongSentence(sent, 220);
+      for (const c of chunks) q.push(c);
+      q.push({ __pause:true, ms: pause });
+      // extra pause for paragraph-y breaks
+      if (/\n\s*\n/.test(sent)) q.push({ __pause:true, ms: Math.max(pause, 350) });
     }
+    speakQueue = q;
 
-    const u = new SpeechSynthesisUtterance(String(item));
-    if (v) u.voice = v;
-    u.rate = parseFloat(rate.value);
-    u.pitch = parseFloat(pitch.value);
+    const step = () => {
+      if (stopped || !speaking) return;
 
-    u.onend = () => {
-      // Small breath between chunks even within a sentence
-      setTimeout(speakNext, 40);
+      if (!speakQueue.length){
+        speaking = false;
+        fabIcon.textContent = "▶";
+        return;
+      }
+
+      const item = speakQueue.shift();
+      if (item && item.__pause){
+        setTimeout(step, item.ms || 250);
+        return;
+      }
+
+      const u = new SpeechSynthesisUtterance(String(item));
+      if (voice) u.voice = voice;
+      u.rate = parseFloat(rate.value);
+      u.pitch = parseFloat(pitch.value);
+
+      u.onend = () => setTimeout(step, 40);
+      u.onerror = () => {
+        setStatus(ttsStatus, "Speech error. Try another voice.", "warn");
+        speaking = false;
+        fabIcon.textContent = "▶";
+      };
+
+      try { speechSynthesis.speak(u); }
+      catch(e){
+        setStatus(ttsStatus, `Speech failed: ${e?.message || String(e)}`, "danger");
+        speaking = false;
+        fabIcon.textContent = "▶";
+      }
     };
-    u.onerror = () => {
-      setStatus(ttsStatus, "Speech error. Try another voice.", "warn");
-      speaking = false;
-      fabIcon.textContent = "▶";
-    };
 
-    try {
-      speechSynthesis.speak(u);
-    } catch (e) {
-      setStatus(ttsStatus, `Speech failed: ${e?.message || String(e)}`, "danger");
-      speaking = false;
-      fabIcon.textContent = "▶";
-    }
-  };
-
-  speakNext();
-}
-
-// Keep your existing pause/resume buttons, but make stop use the new stop
-document.getElementById("stop").addEventListener("click", stopSpeak);
-document.getElementById("speak").addEventListener("click", speakAll);
-/* =========================
-   Load libraries with fallback CDNs
-   ========================= */
-(async function initLibraries(){
-  try{
-    // Mammoth (DOCX)
-    await loadScriptSequential(
-      [
-        "https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js",
-        "https://unpkg.com/mammoth/mammoth.browser.min.js"
-      ],
-      () => typeof window.mammoth !== "undefined",
-      "DOCX engine"
-    );
-  } catch(e){
-    console.warn(e);
+    step();
   }
 
-   try{
-    // PDF.js (legacy build with .js files)
-    await loadScriptSequential(
-      [
-        "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/legacy/build/pdf.min.js"
-      ],
-      () => typeof window.pdfjsLib !== "undefined",
-      "PDF engine"
-    );
-  } catch(e){
-    console.warn(e);
-  }
+  document.getElementById("speak").addEventListener("click", speakFromHere);
+  document.getElementById("pause").addEventListener("click", () => { try{ speechSynthesis.pause(); } catch(e){} fabIcon.textContent="▶"; });
+  document.getElementById("resume").addEventListener("click", () => { try{ speechSynthesis.resume(); } catch(e){} fabIcon.textContent="⏸"; });
+  document.getElementById("stop").addEventListener("click", stopSpeak);
 
-
-  setBanner(true, typeof window.mammoth !== "undefined", typeof window.pdfjsLib !== "undefined");
-})();
-</script>
-
-<script>
-  // Service worker registration (kept tiny and safe)
+  // ===== Service worker =====
   if ("serviceWorker" in navigator) {
     window.addEventListener("load", () => {
       navigator.serviceWorker.register("./sw.js").catch(() => {});
