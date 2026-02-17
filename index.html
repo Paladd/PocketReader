@@ -106,6 +106,8 @@
       max-height:62vh;
       overflow:auto;
       border:1px solid var(--stroke);
+      user-select: text; /* important for selection */
+      -webkit-user-select: text;
     }
     .sent{
       display:inline;
@@ -131,7 +133,7 @@
       width:auto;
     }
     .fabPanel{
-      width: min(380px, calc(100vw - 28px));
+      width: min(420px, calc(100vw - 28px));
       border-radius: 16px;
       border: 1px solid var(--stroke);
       background: rgba(18,20,27,.92);
@@ -142,12 +144,23 @@
     }
     .fabPanel.open{ display: block; }
     .tiny{ font-size:11px; color:var(--muted); }
+
+    /* Selection helper bar */
+    .selectBar{
+      display:none;
+      margin-top:10px;
+      padding:10px;
+      border-radius:12px;
+      border:1px solid var(--stroke2);
+      background: rgba(15,18,32,.75);
+    }
+    .selectBar.show{ display:block; }
   </style>
 
   <!-- DOCX engine -->
   <script src="https://cdn.jsdelivr.net/npm/mammoth/mammoth.browser.min.js"></script>
 
-  <!-- PDF.js legacy build (reliable .js files) -->
+  <!-- PDF.js legacy build -->
   <script src="https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/legacy/build/pdf.min.js"></script>
 </head>
 
@@ -157,7 +170,7 @@
     <div class="logo"></div>
     <div>
       <h1>Pocket Reader</h1>
-      <div class="sub" id="aliveBanner">BUILD v20 • JS: starting…</div>
+      <div class="sub" id="aliveBanner">BUILD v21 • JS: starting…</div>
     </div>
   </div>
 
@@ -194,7 +207,11 @@
           </div>
 
           <div style="height:14px;"></div>
-          <div class="tiny">Start-from-here: tap any sentence in the Reader pane. It will highlight, and Speak will begin there.</div>
+          <div class="tiny">
+            Start reading options:
+            <br>• Tap a sentence in Reader to set the start point.
+            <br>• Or highlight text in Reader, then use “Start Here (Selection)”.
+          </div>
         </div>
 
         <div class="tab" id="tab-gutenberg" style="display:none;">
@@ -218,6 +235,17 @@
       </div>
       <div class="bd">
         <div id="reader">Load something, then tap ▶ to speak.</div>
+
+        <!-- Selection action bar -->
+        <div class="selectBar" id="selectBar">
+          <div class="muted" style="margin-bottom:8px;">Selection detected</div>
+          <div class="row">
+            <button id="startFromSelection" class="primary" style="width:auto;">Start Here (Selection)</button>
+            <button id="clearSelection" class="ghost" style="width:auto;">Clear selection</button>
+          </div>
+          <div class="tiny" id="selectionPreview" style="margin-top:8px;"></div>
+        </div>
+
         <div id="ttsStatus" class="status"></div>
       </div>
     </section>
@@ -232,7 +260,7 @@
     <div class="fabPanel" id="fabPanel">
       <div class="muted">Voice</div>
       <select id="voiceSelect"></select>
-      <div class="tiny" id="voiceHint">Tip: iOS often exposes only a few usable voices to web apps. Samantha is commonly the best free option.</div>
+      <div class="tiny">Note: iOS often exposes only a few usable voices to web apps. Samantha is commonly the best free option.</div>
 
       <div style="height:10px;"></div>
       <div class="row">
@@ -262,10 +290,9 @@
   // ===== Banner truth =====
   const aliveBanner = document.getElementById("aliveBanner");
   function setBanner(){
-    const jsOk = true;
     const docxOk = typeof window.mammoth !== "undefined";
     const pdfOk = typeof window.pdfjsLib !== "undefined";
-    aliveBanner.textContent = `BUILD v20 • JS: RUNNING ✅ • DOCX: ${docxOk ? "LOADED ✅" : "MISSING ❌"} • PDF: ${pdfOk ? "LOADED ✅" : "MISSING ❌"}`;
+    aliveBanner.textContent = `BUILD v21 • JS: RUNNING ✅ • DOCX: ${docxOk ? "LOADED ✅" : "MISSING ❌"} • PDF: ${pdfOk ? "LOADED ✅" : "MISSING ❌"}`;
   }
   setBanner();
 
@@ -293,6 +320,11 @@
   const modeLabel = document.getElementById("modeLabel");
   const ttsStatus = document.getElementById("ttsStatus");
 
+  const selectBar = document.getElementById("selectBar");
+  const selectionPreview = document.getElementById("selectionPreview");
+  const startFromSelectionBtn = document.getElementById("startFromSelection");
+  const clearSelectionBtn = document.getElementById("clearSelection");
+
   const voiceSelect = document.getElementById("voiceSelect");
   const rate = document.getElementById("rate");
   const pitch = document.getElementById("pitch");
@@ -309,25 +341,25 @@
     el.className = "status " + (kind==="warn" ? "warn" : (kind==="danger" ? "dangerText" : ""));
   }
 
-  // ===== Reader + "Start here" =====
-  const state = {
-    textRaw: "",
-    voices: [],
-  };
-
+  // ===== Reader + Start control =====
+  const state = { textRaw: "", voices: [] };
   let sentenceList = [];
   let startIndex = 0;
 
   function splitIntoSentences(text){
     const t = (text || "").replace(/\r\n/g, "\n").trim();
     if (!t) return [];
-
-    // Normalize spacing around newlines (helps sentence split)
     const normalized = t.replace(/\n{3,}/g, "\n\n").replace(/[ \t]+/g, " ");
-
-    // Sentence-ish split (not perfect, but stable and natural enough)
     const parts = normalized.split(/(?<=[.!?])\s+(?=[A-Z0-9“"'\(\[])/g);
     return parts.map(s => s.trim()).filter(Boolean);
+  }
+
+  function highlightSentence(i){
+    startIndex = Math.max(0, Math.min(i, sentenceList.length - 1));
+    [...reader.querySelectorAll(".sent")].forEach(el => el.classList.remove("active"));
+    const el = reader.querySelector(`.sent[data-i="${startIndex}"]`);
+    if (el) el.classList.add("active");
+    setStatus(ttsStatus, `Start set at sentence ${startIndex + 1}.`, "ok");
   }
 
   function renderSentences(text){
@@ -345,18 +377,11 @@
       span.className = "sent";
       span.dataset.i = String(i);
       span.textContent = s + " ";
-      span.addEventListener("click", () => {
-        startIndex = i;
-        [...reader.querySelectorAll(".sent")].forEach(el => el.classList.remove("active"));
-        span.classList.add("active");
-        setStatus(ttsStatus, `Start set at sentence ${i+1}.`, "ok");
-      });
+      span.addEventListener("click", () => highlightSentence(i));
       reader.appendChild(span);
     });
 
-    // auto-highlight first sentence
-    const first = reader.querySelector(".sent");
-    if (first) first.classList.add("active");
+    highlightSentence(0);
   }
 
   function loadText(text, label){
@@ -364,7 +389,75 @@
     docLabel.textContent = label || "Reader";
     modeLabel.textContent = "mode: text";
     renderSentences(state.textRaw);
+    hideSelectionBar();
   }
+
+  // ===== Selection-based "Start Here" =====
+  function getSelectedTextInReader(){
+    const sel = window.getSelection ? window.getSelection() : null;
+    if (!sel || sel.rangeCount === 0) return "";
+
+    const range = sel.getRangeAt(0);
+    if (!reader.contains(range.commonAncestorContainer)) return "";
+    const txt = sel.toString().trim();
+    return txt;
+  }
+
+  function showSelectionBar(txt){
+    if (!txt) return hideSelectionBar();
+    selectBar.classList.add("show");
+    const preview = txt.length > 200 ? (txt.slice(0, 200) + "…") : txt;
+    selectionPreview.textContent = `“${preview}”`;
+  }
+
+  function hideSelectionBar(){
+    selectBar.classList.remove("show");
+    selectionPreview.textContent = "";
+  }
+
+  function clearSelection(){
+    const sel = window.getSelection ? window.getSelection() : null;
+    if (sel) sel.removeAllRanges();
+    hideSelectionBar();
+  }
+
+  function setStartFromSelection(){
+    const txt = getSelectedTextInReader();
+    if (!txt){
+      setStatus(ttsStatus, "No selection found. Highlight text in the Reader first.", "warn");
+      return;
+    }
+
+    // Find best matching sentence by searching raw text
+    // Prefer the first sentence containing the selection (or a trimmed chunk of it).
+    const needle = txt.slice(0, 80).replace(/\s+/g, " ").trim();
+    let idx = 0;
+
+    for (let i = 0; i < sentenceList.length; i++){
+      const s = sentenceList[i];
+      if (s.includes(txt) || s.includes(needle)){
+        idx = i;
+        break;
+      }
+    }
+
+    highlightSentence(idx);
+    clearSelection();
+  }
+
+  // Detect selection changes (mouse + touch)
+  function onSelectionChange(){
+    const txt = getSelectedTextInReader();
+    if (txt) showSelectionBar(txt);
+    else hideSelectionBar();
+  }
+  document.addEventListener("selectionchange", () => {
+    // throttled-ish by the browser; keep it simple
+    onSelectionChange();
+  });
+
+  startFromSelectionBtn.addEventListener("click", setStartFromSelection);
+  clearSelectionBtn.addEventListener("click", clearSelection);
 
   // ===== DOCX =====
   async function docxToText(arrayBuffer){
@@ -378,8 +471,6 @@
   // ===== PDF =====
   async function pdfToText(arrayBuffer){
     if (typeof window.pdfjsLib === "undefined") throw new Error("PDF engine not loaded.");
-
-    // worker must match pdfjs version
     window.pdfjsLib.GlobalWorkerOptions.workerSrc =
       "https://cdn.jsdelivr.net/npm/pdfjs-dist@3.4.120/legacy/build/pdf.worker.min.js";
 
@@ -399,7 +490,6 @@
     };
 
     const pdf = await task.promise;
-
     let out = [];
     for (let p = 1; p <= pdf.numPages; p++){
       const page = await pdf.getPage(p);
@@ -407,7 +497,6 @@
       const pageText = tc.items.map(it => it.str).join(" ");
       out.push(pageText);
     }
-
     return out.join("\n\n").replace(/\s{2,}/g, " ").trim();
   }
 
@@ -422,7 +511,6 @@
     const lower = (f.name || "").toLowerCase();
 
     try{
-      // DOCX
       if (lower.endsWith(".docx") || (f.type||"").includes("wordprocessingml")){
         const text = await docxToText(await f.arrayBuffer());
         loadText(text, `DOCX: ${f.name}`);
@@ -430,7 +518,6 @@
         return;
       }
 
-      // PDF
       if (lower.endsWith(".pdf") || (f.type||"").includes("pdf")){
         const text = await pdfToText(await f.arrayBuffer());
         if (!text || text.length < 20){
@@ -443,7 +530,6 @@
         return;
       }
 
-      // fallback: text
       const raw = await f.text();
       loadText(raw, `File: ${f.name}`);
       setStatus(fileStatus, "Loaded as text.", "ok");
@@ -524,7 +610,7 @@
     }
   });
 
-  // ===== TTS (natural pacing + start-here) =====
+  // ===== TTS (kept as-is for now) =====
   function updatePauseLabel(){
     pauseMsLabel.textContent = `${pauseMs.value} ms`;
   }
@@ -539,11 +625,8 @@
 
   function chooseBestVoice(voices){
     if (!voices || !voices.length) return null;
-
-    // Prefer en-US, then names that tend to be better.
     const pool = voices.filter(v => (v.lang || "").toLowerCase() === "en-us");
     const list = pool.length ? pool : voices;
-
     const rank = (v) => {
       const name = (v.name || "").toLowerCase();
       let score = 0;
@@ -554,7 +637,6 @@
       if (name.includes("premium")) score += 10;
       return score;
     };
-
     return list.slice().sort((a,b) => rank(b) - rank(a))[0] || null;
   }
 
@@ -563,8 +645,6 @@
     if (!vs || !vs.length) return;
 
     state.voices = vs;
-
-    // Show en-US first; keep others but de-emphasize
     const sorted = [...vs].sort((a,b) => {
       const aUS = (a.lang || "").toLowerCase() === "en-us";
       const bUS = (b.lang || "").toLowerCase() === "en-us";
@@ -582,7 +662,6 @@
 
     const best = chooseBestVoice(sorted);
     if (best) voiceSelect.value = best.name;
-
     fabVoice.textContent = best ? `Voice: ${best.name}` : "Voice ready";
   }
 
@@ -624,7 +703,7 @@
       return;
     }
 
-    stopSpeak(); // clear prior state
+    stopSpeak();
     stopped = false;
     speaking = true;
     fabIcon.textContent = "⏸";
@@ -632,15 +711,12 @@
     const voice = state.voices.find(v => v.name === voiceSelect.value) || chooseBestVoice(state.voices);
     const pause = parseInt(pauseMs.value || "250", 10);
 
-    // Build queue: sentences from startIndex
     const q = [];
     for (let i = startIndex; i < sentenceList.length; i++){
       const sent = sentenceList[i];
       const chunks = chunkLongSentence(sent, 220);
       for (const c of chunks) q.push(c);
       q.push({ __pause:true, ms: pause });
-      // extra pause for paragraph-y breaks
-      if (/\n\s*\n/.test(sent)) q.push({ __pause:true, ms: Math.max(pause, 350) });
     }
     speakQueue = q;
 
