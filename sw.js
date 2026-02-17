@@ -1,4 +1,4 @@
-const CACHE_NAME = "pocket-reader-v20";
+const CACHE_NAME = "pocket-reader-v21";
 const ASSETS = [
   "./",
   "./index.html",
@@ -20,8 +20,6 @@ self.addEventListener("activate", (event) => {
 
 self.addEventListener("fetch", (event) => {
   const url = new URL(event.request.url);
-
-  // Cache-first for same-origin assets, network for everything else
   if (url.origin === location.origin) {
     event.respondWith(
       caches.match(event.request).then(cached => cached || fetch(event.request).then(resp => {
